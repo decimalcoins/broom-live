@@ -12,7 +12,7 @@
 
           // Backend Configuration
           export const BACKEND_CONFIG = {
-            BASE_URL: "", 
+            BASE_URL: process.env.NEXT_PUBLIC_APP_URL ||"", 
           } as const;
 
           // Backend URLs

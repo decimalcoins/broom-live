@@ -7,10 +7,9 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { PI_NETWORK_CONFIG } from "@/lib/system-config";
 import { api, setApiAuthToken } from "@/lib/api";
-import { BACKEND_URLS, PI_NETWORK_CONFIG } from "@/lib/system-config";
 
-/* ================== TYPES ================== */
 export type LoginDTO = {
   id: string;
   username: string;
@@ -18,19 +17,14 @@ export type LoginDTO = {
   terms_accepted: boolean;
 };
 
-interface PiAuthResult {
-  accessToken: string;
-  user: {
-    uid: string;
-    username: string;
-  };
-}
-
 declare global {
   interface Window {
     Pi?: {
       init: (config: { version: string; sandbox?: boolean }) => Promise<void>;
-      authenticate: (scopes: string[]) => Promise<PiAuthResult>;
+      authenticate: (scopes: string[]) => Promise<{
+        accessToken: string;
+        user: { uid: string; username: string };
+      }>;
     };
   }
 }
@@ -42,83 +36,70 @@ interface PiAuthContextType {
   reinitialize: () => Promise<void>;
 }
 
-/* ================== CONTEXT ================== */
 const PiAuthContext = createContext<PiAuthContextType | null>(null);
 
-/* ================== DEV USER ================== */
+/* =========================
+   DEV FALLBACK (NON PI)
+========================= */
 const DEV_USER: LoginDTO = {
-  id: "dev-001",
+  id: "dev-user",
   username: "Developer",
   credits_balance: 999999,
   terms_accepted: true,
 };
 
-/* ================== LOAD SDK ================== */
-function loadPiSDK(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (window.Pi) return resolve();
-
-    const script = document.createElement("script");
-    script.src = PI_NETWORK_CONFIG.SDK_URL!;
-    script.async = true;
-
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Failed to load Pi SDK"));
-
-    document.head.appendChild(script);
-  });
-}
-
-/* ================== PROVIDER ================== */
 export function PiAuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authMessage, setAuthMessage] = useState("Initializing...");
   const [userData, setUserData] = useState<LoginDTO | null>(null);
 
-  const loginWithPi = async () => {
-    setAuthMessage("Authenticating with Pi...");
-
-    const auth = await window.Pi!.authenticate(["username"]);
-
-    setAuthMessage("Logging in...");
-    const res = await api.post<LoginDTO>(BACKEND_URLS.LOGIN, {
-      pi_auth_token: auth.accessToken,
-    });
-
-    setApiAuthToken(auth.accessToken);
-    setUserData(res.data);
-    setIsAuthenticated(true);
-  };
-
-  const initialize = async () => {
+  const initPi = async () => {
     try {
-      await loadPiSDK();
+      setAuthMessage("Loading Pi SDK...");
 
-      if (window.Pi) {
-        // Pi Browser / Sandbox
-        await window.Pi.init({
-          version: "2.0",
-          sandbox: PI_NETWORK_CONFIG.SANDBOX,
-        });
-
-        // WAJIB JEDA
-        await new Promise((r) => setTimeout(r, 800));
-
-        await loginWithPi();
-      } else {
-        // Browser biasa
-        setAuthMessage("Dev Login");
-        setUserData(DEV_USER);
-        setIsAuthenticated(true);
+      if (!window.Pi) {
+        throw new Error("Pi SDK not available");
       }
+
+      await window.Pi.init({
+        version: "2.0",
+        sandbox: true, // ✅ WAJIB TRUE untuk sandbox.minepi.com
+      });
+
+      setAuthMessage("Authenticating with Pi...");
+      const auth = await window.Pi.authenticate(["username"]);
+
+      // ⚠️ Backend login OPTIONAL dulu
+      setApiAuthToken(auth.accessToken);
+
+      setUserData({
+        id: auth.user.uid,
+        username: auth.user.username,
+        credits_balance: 0,
+        terms_accepted: true,
+      });
+
+      setIsAuthenticated(true);
     } catch (err) {
-      console.error("Pi Auth Error:", err);
-      setAuthMessage("Authentication failed");
+      console.error("❌ Pi Auth failed:", err);
+      setAuthMessage("Pi Auth failed, fallback to dev");
+      setUserData(DEV_USER);
+      setIsAuthenticated(true);
     }
   };
 
   useEffect(() => {
-    initialize();
+    const isPiBrowser =
+      typeof window !== "undefined" && typeof window.Pi !== "undefined";
+
+    if (isPiBrowser) {
+      console.log("🟣 Pi Browser detected");
+      initPi();
+    } else {
+      console.log("🖥 Normal browser → Dev mode");
+      setUserData(DEV_USER);
+      setIsAuthenticated(true);
+    }
   }, []);
 
   return (
@@ -127,7 +108,7 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated,
         authMessage,
         userData,
-        reinitialize: initialize,
+        reinitialize: initPi,
       }}
     >
       {children}
@@ -135,11 +116,8 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
-/* ================== HOOK ================== */
 export function usePiAuth() {
   const ctx = useContext(PiAuthContext);
-  if (!ctx) {
-    throw new Error("usePiAuth must be used inside PiAuthProvider");
-  }
+  if (!ctx) throw new Error("usePiAuth must be inside PiAuthProvider");
   return ctx;
 }
