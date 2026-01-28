@@ -1,23 +1,4 @@
-/**
- * Global fetch-based client for making API requests.
- *
- * - Set auth with `setApiAuthToken(token)`; it injects the Authorization header.
- * - Parses JSON automatically; for 204 responses `data` is `null`.
- * - Returns `{ data, status, statusText, headers }`.
- * - On non-2xx, throws an Error with `status` and `data`.
- *
- * @example
- * import { api } from '@/lib/api';
- *
- * const createThing = async () => {
- *   const { data } = await api.post('/api/your-endpoint', { data: 'your data' });
- *   console.log(data);
- * };
- *
- * await api.get('/api/users');
- * await api.put('/api/user/123', { name: 'Updated' });
- * await api.delete('/api/user/123');
- */
+import { BACKEND_CONFIG } from "./system-config";
 
 type FetchResponse<T> = {
   data: T;
@@ -37,6 +18,21 @@ const defaultHeaders: Record<string, string> = {
   "Content-Type": "application/json",
 };
 
+//  RESOLVE BASE URL 
+const resolveBaseURL = () => {
+  if (BACKEND_CONFIG.BASE_URL && BACKEND_CONFIG.BASE_URL.length > 0) {
+    return BACKEND_CONFIG.BASE_URL;
+  }
+
+  if (typeof window !== "undefined") {
+    return window.location.origin;
+  }
+
+  return "http://localhost:3000";
+};
+
+const BASE_URL = resolveBaseURL();
+
 const request = async <T = any>(
   url: string,
   init: RequestInit = {}
@@ -45,12 +41,19 @@ const request = async <T = any>(
     ...defaultHeaders,
     ...(init.headers as Record<string, string> | undefined),
   };
+
   if (authToken) headers["Authorization"] = authToken;
 
-  const response = await fetch(url, { ...init, headers });
+  //  BASE_URL
+  const fullUrl = url.startsWith("http")
+    ? url
+    : `${BASE_URL}${url}`;
+
+  const response = await fetch(fullUrl, { ...init, headers });
 
   const contentType = response.headers.get("content-type") || "";
   const isJson = contentType.includes("application/json");
+
   const data =
     response.status === 204
       ? null
