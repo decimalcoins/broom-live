@@ -42,7 +42,7 @@ export function GiftPicker({ streamId, hostId, onGiftSent }: GiftPickerProps) {
     if (!open) return
 
     setGifts([
-      { id: "1", name: "Rose 🌹", coin_cost: 10, image_url: "🌹" },
+      { id: "1", name: "Rose 🌹", coin_cost: 1, image_url: "🌹" },
       { id: "2", name: "Diamond 💎", coin_cost: 50, image_url: "💎" },
       { id: "3", name: "Rocket 🚀", coin_cost: 100, image_url: "🚀" },
     ] as any)
