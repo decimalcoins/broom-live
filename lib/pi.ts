@@ -1,15 +1,23 @@
 export async function verifyPiToken(accessToken: string) {
-  const apiUrl = "https://api.minepi.com/v2/me"
+  const apiKey = process.env.PI_SERVER_API_KEY
+  const apiUrl = "https://api.minepi.com"
 
-  const res = await fetch(apiUrl, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  })
+  if (!apiKey) throw new Error("Missing PI_SERVER_API_KEY")
+
+  const res = await fetch(
+    `${apiUrl}/v2/me?accessToken=${accessToken}`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Key ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+    }
+  )
 
   if (!res.ok) {
-    console.error("❌ Pi Token Verify Failed:", await res.text())
+    const errText = await res.text()
+    console.error("Pi Verify Error:", errText)
     throw new Error("Invalid Pi Token")
   }
 

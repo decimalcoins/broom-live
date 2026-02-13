@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 
 import { usePiAuth } from "@/contexts/pi-auth-context"
+import { useCoins } from "@/contexts/coin-context"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -21,8 +22,7 @@ import { BuyCoinsDialog } from "@/components/buy-coins-dialog"
 export default function HomePage() {
   const router = useRouter()
   const { userData } = usePiAuth()
-
-  const isDev = process.env.NEXT_PUBLIC_APP_MODE === "dev"
+  const { balance } = useCoins()
 
   const [liveStreams, setLiveStreams] = useState<Stream[]>([])
   const [loading, setLoading] = useState(true)
@@ -38,42 +38,6 @@ export default function HomePage() {
     setLoading(true)
 
     try {
-      // ============================
-      // ✅ DEV MODE → Mock Streams
-      // ============================
-      if (isDev) {
-        console.warn("⚡ DEV MODE: Using mock live streams")
-
-        setLiveStreams([
-          {
-            id: "mock-stream-1",
-            title: "DEV Stream Testing 🎥",
-            description: "This is a simulated stream for UI testing",
-            host_id: "dev-host",
-            host_username: "Developer",
-            viewer_count: 12,
-            thumbnail_url: "",
-            is_live: true,
-          },
-          {
-            id: "mock-stream-2",
-            title: "Broom Live Demo 🚀",
-            description: "Mock stream for Pi Browser preparation",
-            host_id: "dev-host2",
-            host_username: "BroomHost",
-            viewer_count: 7,
-            thumbnail_url: "",
-            is_live: true,
-          },
-        ] as any)
-
-        setLoading(false)
-        return
-      }
-
-      // ============================
-      // ✅ PROD MODE → Backend Streams
-      // ============================
       const response = await api.get<Stream[]>(
         `${API_ROUTES.GET_STREAMS}?is_live=true`
       )
@@ -91,6 +55,7 @@ export default function HomePage() {
       {/* HEADER */}
       <header className="border-b bg-card">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+          
           {/* Logo */}
           <div className="flex items-center gap-2">
             <Video className="w-8 h-8 text-primary" />
@@ -99,9 +64,11 @@ export default function HomePage() {
 
           {/* Right */}
           <div className="flex items-center gap-3">
-            <CoinBalance balance={userData?.coin_balance || 0} />
+            {/* Coin Balance realtime */}
+            <CoinBalance balance={balance} />
 
-            {userData?.role === "host" && (
+            {/* Host Dashboard */}
+            {userData?.role === "HOST" && (
               <Button
                 onClick={() => router.push("/dashboard/host")}
                 variant="outline"
@@ -110,7 +77,8 @@ export default function HomePage() {
               </Button>
             )}
 
-            {userData?.role === "admin" && (
+            {/* Admin Dashboard */}
+            {userData?.role === "ADMIN" && (
               <Button
                 onClick={() => router.push("/dashboard/admin")}
                 variant="outline"
@@ -124,6 +92,7 @@ export default function HomePage() {
 
       {/* MAIN */}
       <main className="container mx-auto px-4 py-8">
+        
         {/* Top Section */}
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -131,16 +100,9 @@ export default function HomePage() {
             <p className="text-muted-foreground">
               Watch and interact with live streams
             </p>
-
-            {/* DEV Badge */}
-            {isDev && (
-              <p className="text-xs text-yellow-500 mt-1">
-                ⚡ DEV MODE: Streams are simulated
-              </p>
-            )}
           </div>
 
-          <BuyCoinsDialog onSuccess={() => window.location.reload()} />
+          <BuyCoinsDialog onSuccess={() => fetchLiveStreams()} />
         </div>
 
         {/* CONTENT */}
@@ -159,7 +121,7 @@ export default function HomePage() {
                 Check back later or start your own stream!
               </p>
 
-              {userData?.role === "host" && (
+              {userData?.role === "HOST" && (
                 <Button onClick={() => router.push("/dashboard/host")}>
                   Go to Dashboard
                 </Button>
@@ -175,6 +137,7 @@ export default function HomePage() {
                 onClick={() => router.push(`/stream/${stream.id}`)}
               >
                 <CardHeader className="relative p-0">
+                  
                   {/* Thumbnail */}
                   <div className="aspect-video bg-muted flex items-center justify-center rounded-t-lg">
                     <Video className="w-16 h-16 text-muted-foreground" />

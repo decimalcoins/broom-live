@@ -8,8 +8,8 @@ import React, {
   type ReactNode,
 } from "react"
 
-import { PI_NETWORK_CONFIG, BACKEND_URLS } from "@/lib/system-config"
 import { api, setApiAuthToken } from "@/lib/api"
+import { BACKEND_URLS } from "@/lib/system-config"
 
 interface PiAuthResult {
   accessToken: string
@@ -21,15 +21,9 @@ interface PiAuthResult {
 
 declare global {
   interface Window {
-    Pi: {
+    Pi?: {
       init: (config: { version: string; sandbox?: boolean }) => Promise<void>
-
       authenticate: (scopes: string[]) => Promise<PiAuthResult>
-
-      createPayment: (
-        paymentData: any,
-        callbacks: any
-      ) => Promise<any>
     }
   }
 }
@@ -50,25 +44,9 @@ interface PiAuthContextType {
 
 const PiAuthContext = createContext<PiAuthContextType | undefined>(undefined)
 
-// ============================
-// Load Pi SDK
-// ============================
-function loadPiSDK(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const script = document.createElement("script")
-    script.src = PI_NETWORK_CONFIG.SDK_URL
-    script.async = true
-
-    script.onload = () => resolve()
-    script.onerror = () => reject(new Error("Failed to load Pi SDK"))
-
-    document.head.appendChild(script)
-  })
-}
-
 export function PiAuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [authMessage, setAuthMessage] = useState("Initializing Pi...")
+  const [authMessage, setAuthMessage] = useState("Starting Pi Login...")
   const [userData, setUserData] = useState<LoginDTO | null>(null)
 
   useEffect(() => {
@@ -76,62 +54,72 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
       try {
         if (typeof window === "undefined") return
 
-        // ============================
-        // Load Pi SDK
-        // ============================
-        if (!window.Pi) {
-          setAuthMessage("Loading Pi SDK...")
-          await loadPiSDK()
+        // ===============================
+        // ✅ Wait until Pi SDK injected
+        // ===============================
+        let attempts = 0
+        while (!window.Pi && attempts < 15) {
+          await new Promise((r) => setTimeout(r, 300))
+          attempts++
         }
 
         if (!window.Pi) {
-          throw new Error("Pi Browser required")
+          throw new Error("Pi Browser not detected")
         }
 
-        // ============================
-        // Init Pi
-        // ============================
-        setAuthMessage("Initializing Pi Network...")
+        // ===============================
+        // ✅ Init Pi SDK
+        // ===============================
+        setAuthMessage("Initializing Pi SDK...")
 
         await window.Pi.init({
           version: "2.0",
           sandbox: false,
         })
 
-        // ============================
-        // Authenticate Pioneer
-        // ============================
+        // ===============================
+        // ✅ Authenticate
+        // ===============================
         setAuthMessage("Authenticating with Pi...")
 
-        const auth = await window.Pi.authenticate([
-          "username",
-          "payments",
-        ])
+        const auth = await window.Pi.authenticate(["username"])
 
-        // Save token globally
-        setApiAuthToken(auth.accessToken)
+        if (!auth?.accessToken) {
+          throw new Error("Pi authentication failed")
+        }
 
-        // ============================
-        // Backend Login
-        // ============================
+        // ===============================
+        // ✅ Backend Login
+        // ===============================
         setAuthMessage("Logging into backend...")
 
         const loginRes = await api.post(BACKEND_URLS.LOGIN, {
           pi_auth_token: auth.accessToken,
         })
 
-        // ✅ backend returns { success, user }
-        if (!loginRes.data.success) {
-          throw new Error(loginRes.data.error || "Login failed")
+        if (!loginRes.data?.user) {
+          throw new Error("Backend login failed: no user returned")
         }
 
+        // ===============================
+        // ✅ Save token globally
+        // ===============================
+        setApiAuthToken(auth.accessToken)
+
+        // ===============================
+        // ✅ Save user session
+        // ===============================
         setUserData(loginRes.data.user)
         setIsAuthenticated(true)
 
         setAuthMessage("Login Success 🎉")
-      } catch (err) {
+      } catch (err: any) {
         console.error("❌ Pi Auth Error:", err)
-        setAuthMessage("Authentication failed. Please open in Pi Browser.")
+
+        setAuthMessage(
+          err.message ||
+            "Authentication failed. Please open inside Pi Browser."
+        )
       }
     }
 
