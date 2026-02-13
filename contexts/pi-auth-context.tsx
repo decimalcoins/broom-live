@@ -23,7 +23,13 @@ declare global {
   interface Window {
     Pi: {
       init: (config: { version: string; sandbox?: boolean }) => Promise<void>
+
       authenticate: (scopes: string[]) => Promise<PiAuthResult>
+
+      createPayment: (
+        paymentData: any,
+        callbacks: any
+      ) => Promise<any>
     }
   }
 }
@@ -70,7 +76,9 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
       try {
         if (typeof window === "undefined") return
 
-        // Must be Pi Browser
+        // ============================
+        // Load Pi SDK
+        // ============================
         if (!window.Pi) {
           setAuthMessage("Loading Pi SDK...")
           await loadPiSDK()
@@ -80,6 +88,9 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
           throw new Error("Pi Browser required")
         }
 
+        // ============================
+        // Init Pi
+        // ============================
         setAuthMessage("Initializing Pi Network...")
 
         await window.Pi.init({
@@ -87,20 +98,34 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
           sandbox: false,
         })
 
+        // ============================
+        // Authenticate Pioneer
+        // ============================
         setAuthMessage("Authenticating with Pi...")
 
-        const auth = await window.Pi.authenticate(["username"])
+        const auth = await window.Pi.authenticate([
+          "username",
+          "payments",
+        ])
 
+        // Save token globally
+        setApiAuthToken(auth.accessToken)
+
+        // ============================
+        // Backend Login
+        // ============================
         setAuthMessage("Logging into backend...")
 
-        const loginRes = await api.post<LoginDTO>(BACKEND_URLS.LOGIN, {
+        const loginRes = await api.post(BACKEND_URLS.LOGIN, {
           pi_auth_token: auth.accessToken,
         })
 
-        // Save token for API requests
-        setApiAuthToken(auth.accessToken)
+        // ✅ backend returns { success, user }
+        if (!loginRes.data.success) {
+          throw new Error(loginRes.data.error || "Login failed")
+        }
 
-        setUserData(loginRes.data)
+        setUserData(loginRes.data.user)
         setIsAuthenticated(true)
 
         setAuthMessage("Login Success 🎉")

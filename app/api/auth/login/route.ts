@@ -69,14 +69,14 @@ export async function POST(req: Request) {
     // ✅ BONUS + ROLE RULES
     // ============================
     let bonusCoin = 0
-    let role = "USER"
+    let role = "viewer" // default viewer
 
     if (loginOrder >= 1 && loginOrder <= 20) {
       bonusCoin = 5000
-      role = "HOST"
+      role = "host"
     } else if (loginOrder >= 21 && loginOrder <= 100) {
       bonusCoin = 500
-      role = "HOST"
+      role = "host"
     }
 
     // ============================
@@ -108,7 +108,7 @@ export async function POST(req: Request) {
       message:
         loginOrder <= 100
           ? "🎉 Congrats! You are now a HOST!"
-          : "Welcome! Viewer access only.",
+          : "Welcome! Viewer access only. Unlock host with 1 Pi.",
     })
   } catch (err: any) {
     await client.query("ROLLBACK")

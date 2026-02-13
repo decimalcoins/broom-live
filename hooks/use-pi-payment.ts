@@ -28,27 +28,12 @@ export function usePiPayment() {
     paymentData: PaymentData
   ): Promise<PaymentDTO | null> => {
     // ============================
-    // ✅ DEV MODE → Dummy Payment
+    // ✅ Pi Browser Required
     // ============================
-    if (process.env.NEXT_PUBLIC_APP_MODE === "dev") {
-      console.warn("⚡ DEV MODE: Simulating Pi Payment")
+    if (typeof window === "undefined") return null
 
-      return {
-        identifier: "dev-payment-001",
-        user_uid: "dev-user",
-        amount: paymentData.amount,
-        memo: paymentData.memo,
-        metadata: paymentData.metadata,
-        status: {},
-        transaction: {},
-      }
-    }
-
-    // ============================
-    // ✅ PROD MODE → Pi Browser Required
-    // ============================
-    if (typeof window.Pi === "undefined") {
-      setError("Pi SDK not available. Please use Pi Browser.")
+    if (!window.Pi || !window.Pi.createPayment) {
+      setError("Pi SDK not available. Please open in Pi Browser.")
       return null
     }
 
@@ -56,20 +41,23 @@ export function usePiPayment() {
     setError(null)
 
     try {
+      console.log("💰 Creating Pi Payment:", paymentData)
+
       const payment = await window.Pi.createPayment(paymentData, {
         // ============================
-        // 1. Server Approval Required
+        // ✅ 1. Server Approval Required
         // ============================
         onReadyForServerApproval: async (paymentId: string) => {
           console.log("✅ Ready for approval:", paymentId)
 
           await api.post(API_ROUTES.PAYMENT_APPROVE, {
             payment_id: paymentId,
+            metadata: paymentData.metadata,
           })
         },
 
         // ============================
-        // 2. Server Completion Required
+        // ✅ 2. Server Completion Required
         // ============================
         onReadyForServerCompletion: async (
           paymentId: string,
@@ -83,18 +71,24 @@ export function usePiPayment() {
           })
         },
 
-        // Cancel
+        // ============================
+        // Cancel Payment
+        // ============================
         onCancel: (paymentId: string) => {
-          console.warn("Payment cancelled:", paymentId)
+          console.warn("❌ Payment cancelled:", paymentId)
           setError("Payment was cancelled")
         },
 
-        // Error
+        // ============================
+        // Error Handler
+        // ============================
         onError: (err: Error) => {
-          console.error("Payment error:", err)
+          console.error("❌ Payment error:", err)
           setError(err.message)
         },
       })
+
+      console.log("✅ Payment Created:", payment)
 
       return payment
     } catch (err) {
