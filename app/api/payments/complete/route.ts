@@ -1,23 +1,43 @@
 import { NextResponse } from "next/server"
+import { PI_API_BASE, piHeaders } from "@/lib/pi/piClient"
+import { completePayment } from "@/lib/payments-db"
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json()
-    const { payment_id, txid } = body
+    const { paymentId, txid } = await req.json()
 
-    console.log("✅ PAYMENT COMPLETE (Internal API)", payment_id, txid)
+    // 1. Complete ke Pi API
+    const res = await fetch(
+      `${PI_API_BASE}/payments/${paymentId}/complete`,
+      {
+        method: "POST",
+        headers: piHeaders(),
+        body: JSON.stringify({ txid }),
+      }
+    )
 
-    // DEV fallback: always complete
+    const data = await res.json()
+
+    if (!res.ok) {
+      return NextResponse.json(
+        { success: false, error: "Complete failed", details: data },
+        { status: res.status }
+      )
+    }
+
+    // 2. Update DB
+    await completePayment({ paymentId, txid })
+
     return NextResponse.json({
       success: true,
-      payment_id,
-      txid,
       completed: true,
+      pi_payment: data,
     })
   } catch (err) {
-    console.error("❌ Complete error:", err)
+    console.error("❌ Complete Error:", err)
+
     return NextResponse.json(
-      { success: false, error: "Complete failed" },
+      { success: false, error: "Internal server error" },
       { status: 500 }
     )
   }

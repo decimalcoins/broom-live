@@ -29,6 +29,7 @@ interface GiftPickerProps {
 export function GiftPicker({ streamId, hostId, onGiftSent }: GiftPickerProps) {
   const [open, setOpen] = useState(false)
   const [gifts, setGifts] = useState<GiftType[]>([])
+  const [sending, setSending] = useState(false)
 
   const { balance, setBalance } = useCoins()
   const { userData } = usePiAuth()
@@ -37,7 +38,9 @@ export function GiftPicker({ streamId, hostId, onGiftSent }: GiftPickerProps) {
   const roomName = `broom_${hostId}`
   const { sendData } = useLiveKit(roomName, null)
 
-  // Load mock gifts
+  // ============================
+  // Load Gifts (Static List)
+  // ============================
   useEffect(() => {
     if (!open) return
 
@@ -49,31 +52,70 @@ export function GiftPicker({ streamId, hostId, onGiftSent }: GiftPickerProps) {
   }, [open])
 
   // ======================================================
-  // ✅ Send Gift Realtime
+  // ✅ Send Gift (Backend + Realtime)
   // ======================================================
   const handleSendGift = async (gift: GiftType) => {
+    if (!userData) {
+      alert("Login required")
+      return
+    }
+
     if (balance < gift.coin_cost) {
       alert("❌ Not enough coins")
       return
     }
 
-    // Deduct balance instantly
-    setBalance(balance - gift.coin_cost)
+    if (sending) return
+    setSending(true)
 
-    // ✅ Publish gift event via LiveKit DataChannel
-    sendData({
-      type: "gift",
-      data: {
-        id: `gift-${Date.now()}`,
-        sender_username: userData?.username,
-        gift,
-      },
-    })
+    try {
+      // ============================
+      // 1. Call Backend Gift API
+      // ============================
+      const res = await fetch("/api/gifts/send", {
+        method: "POST",
+        body: JSON.stringify({
+          streamId: Number(streamId),
+          senderId: userData.id,
+          giftAmount: gift.coin_cost,
+        }),
+      })
 
-    console.log("🎁 Gift Sent:", gift.name)
+      const data = await res.json()
 
-    onGiftSent()
-    setOpen(false)
+      if (!data.success) {
+        alert("❌ Gift failed: " + data.error)
+        setSending(false)
+        return
+      }
+
+      // ============================
+      // 2. Update Balance Locally
+      // ============================
+      setBalance(balance - gift.coin_cost)
+
+      // ============================
+      // 3. Trigger Realtime Animation
+      // ============================
+      sendData({
+        type: "gift",
+        data: {
+          id: `gift-${Date.now()}`,
+          sender_username: userData.username,
+          gift,
+        },
+      })
+
+      console.log("🎁 Gift Sent Successfully:", gift.name)
+
+      onGiftSent()
+      setOpen(false)
+    } catch (err) {
+      console.error("❌ Gift Send Error:", err)
+      alert("Gift failed. Try again.")
+    } finally {
+      setSending(false)
+    }
   }
 
   return (
@@ -95,7 +137,9 @@ export function GiftPicker({ streamId, hostId, onGiftSent }: GiftPickerProps) {
           {gifts.map((gift) => (
             <Card
               key={gift.id}
-              className="p-4 cursor-pointer hover:scale-105 transition"
+              className={`p-4 cursor-pointer hover:scale-105 transition ${
+                sending ? "opacity-50 pointer-events-none" : ""
+              }`}
               onClick={() => handleSendGift(gift)}
             >
               <div className="text-4xl text-center mb-2">
@@ -117,8 +161,14 @@ export function GiftPicker({ streamId, hostId, onGiftSent }: GiftPickerProps) {
         {/* Balance */}
         <div className="flex justify-between border-t pt-2 text-sm">
           <span>Your balance:</span>
-          <b>{balance} coins</b>
+          <b>{balance.toLocaleString()} coins</b>
         </div>
+
+        {sending && (
+          <p className="text-xs text-muted-foreground mt-2 text-center">
+            Sending gift...
+          </p>
+        )}
       </DialogContent>
     </Dialog>
   )

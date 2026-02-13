@@ -2,6 +2,7 @@
 
 import type React from "react"
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 
 import { useLiveKit } from "@/hooks/use-livekit"
 import { VideoPlayer } from "./video-player"
@@ -18,14 +19,14 @@ interface ViewerStreamViewProps {
 }
 
 export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
-  const isDev = process.env.NEXT_PUBLIC_APP_MODE === "dev"
+  const router = useRouter()
 
   const [token, setToken] = useState<string | null>(null)
   const [loadingToken, setLoadingToken] = useState(true)
   const [tokenError, setTokenError] = useState<string | null>(null)
 
   // ============================
-  // ✅ ROOM NAME
+  // ROOM NAME
   // ============================
   const roomName = stream.host_username
     ? `broom_${stream.host_username}`
@@ -34,27 +35,7 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
   const { room, connect, disconnect, isConnected } = useLiveKit(roomName, token)
 
   // ============================
-  // ✅ DEV MODE UI
-  // ============================
-  if (isDev) {
-    return (
-      <div className="flex flex-col h-screen bg-black text-white items-center justify-center">
-        <div className="text-center space-y-3">
-          <p className="text-2xl font-bold">🎥 DEV VIEWER MODE</p>
-          <p className="text-white/70">LiveKit disabled in DEV mode.</p>
-
-          <p className="text-sm bg-white/10 px-4 py-2 rounded-lg">
-            Room: <b>{roomName}</b>
-          </p>
-        </div>
-
-        {children}
-      </div>
-    )
-  }
-
-  // ============================
-  // ✅ Fetch Viewer Token
+  // FETCH VIEWER TOKEN
   // ============================
   useEffect(() => {
     if (!roomName) return
@@ -62,15 +43,10 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
     const fetchToken = async () => {
       try {
         setLoadingToken(true)
-        setTokenError(null)
-
-        console.log("🔑 Fetching VIEWER token...")
 
         const res = await fetch("/api/livekit/token", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             roomName,
             identity: `viewer-${Date.now()}`,
@@ -84,10 +60,8 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
           throw new Error(data.error || "Viewer token generation failed")
         }
 
-        console.log("✅ Viewer token received")
         setToken(data.token)
       } catch (err: any) {
-        console.error("❌ Failed to fetch viewer token:", err)
         setTokenError(err.message)
       } finally {
         setLoadingToken(false)
@@ -98,16 +72,38 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
   }, [roomName])
 
   // ============================
-  // ✅ Connect Room
+  // CONNECT ROOM
   // ============================
   useEffect(() => {
     if (!token) return
-
-    console.log("🔌 Viewer connecting...")
     connect()
-
     return () => disconnect()
-  }, [token, connect, disconnect])
+  }, [token])
+
+  // ============================
+  // ✅ LISTEN STREAM END EVENT
+  // ============================
+  useEffect(() => {
+    if (!room) return
+
+    const handleData = (payload: Uint8Array) => {
+      try {
+        const msg = JSON.parse(new TextDecoder().decode(payload))
+
+        if (msg.type === "stream_end") {
+          alert("🛑 Stream has ended")
+
+          disconnect()
+          router.push("/dashboard")
+        }
+      } catch (err) {
+        console.error("Data parse error:", err)
+      }
+    }
+
+    room.on("dataReceived", handleData)
+    return () => room.off("dataReceived", handleData)
+  }, [room])
 
   // ============================
   // UI STATES
@@ -123,12 +119,7 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
   if (tokenError) {
     return (
       <div className="h-screen flex items-center justify-center bg-black text-white">
-        <div className="text-center space-y-3">
-          <p className="text-xl font-bold text-red-500">
-            ❌ Failed to Join Stream
-          </p>
-          <p className="text-sm text-white/70">{tokenError}</p>
-        </div>
+        <p className="text-red-500">❌ {tokenError}</p>
       </div>
     )
   }
@@ -142,7 +133,7 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
   }
 
   // ============================
-  // ✅ Find Host Participant
+  // HOST PARTICIPANT
   // ============================
   const remoteParticipants = Array.from(room.remoteParticipants.values())
 
@@ -150,7 +141,6 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
     p.identity.startsWith("host-")
   )
 
-  // Kalau host belum join
   if (!hostParticipant) {
     return (
       <div className="h-screen flex items-center justify-center bg-black text-white">
@@ -160,19 +150,17 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
   }
 
   // ============================
-  // ✅ Get Host Video Track
+  // HOST VIDEO TRACK
   // ============================
   const publication = hostParticipant.getTrackPublication(
     Track.Source.Camera
   )
 
   const videoTrack = publication?.track
-
-  // Viewer count = semua remote participant selain viewer sendiri
   const viewerCount = remoteParticipants.length
 
   // ============================
-  // ✅ MAIN UI
+  // MAIN UI
   // ============================
   return (
     <div className="flex flex-col h-screen bg-black relative">
@@ -184,15 +172,8 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
           className="w-full h-full"
         />
       ) : (
-        <div className="flex items-center justify-center h-full text-white text-center px-6">
-          <div className="space-y-2">
-            <p className="text-xl font-bold">
-              {isConnected ? "Waiting for host video..." : "Connecting..."}
-            </p>
-            <p className="text-white/60 text-sm">
-              Host may not have enabled camera yet.
-            </p>
-          </div>
+        <div className="flex items-center justify-center h-full text-white">
+          <p>{isConnected ? "Waiting for host video..." : "Connecting..."}</p>
         </div>
       )}
 

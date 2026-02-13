@@ -31,32 +31,8 @@ import { Label } from "@/components/ui/label"
 
 import { useRouter } from "next/navigation"
 
-//
-// ✅ DEV MOCK DATA
-//
-const DEV_WITHDRAWALS: Withdrawal[] = [
-  {
-    id: "wd-001",
-    host_username: "HostOne",
-    coin_amount: 50000,
-    pi_amount: 0.15,
-    platform_fee_percentage: 10,
-    platform_fee_coins: 5000,
-    net_pi_amount: 0.135,
-    status: "pending",
-    requested_at: new Date().toISOString(),
-    admin_notes: "",
-  },
-]
-
-const DEV_CONFIG: AppConfig = {
-  platform_fee_percentage: 10,
-  pi_to_coin_rate: 314159,
-  coin_to_gift_rate: 10,
-}
-
 export default function AdminDashboardPage() {
-  const { userData } = usePiAuth()
+  const { userData, authMessage, isAuthenticated } = usePiAuth()
   const router = useRouter()
 
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([])
@@ -64,38 +40,26 @@ export default function AdminDashboardPage() {
   const [platformFee, setPlatformFee] = useState("")
   const [loading, setLoading] = useState(true)
 
-  const isDev = process.env.NEXT_PUBLIC_APP_MODE === "dev"
-
+  // ============================
+  // ✅ ADMIN ROLE GUARD
+  // ============================
   useEffect(() => {
-    if (userData) {
-      if (userData.role !== "admin") {
-        router.push("/")
-        return
-      }
-      fetchAdminData()
+    if (!isAuthenticated) return
+    if (!userData) return
+
+    if (userData.role !== "ADMIN") {
+      router.push("/dashboard")
+      return
     }
-  }, [userData, router])
+
+    fetchAdminData()
+  }, [userData, isAuthenticated])
 
   // ============================
   // Fetch Admin Data
   // ============================
   const fetchAdminData = async () => {
     try {
-      // ============================
-      // DEV MODE → Mock Admin Data
-      // ============================
-      if (isDev) {
-        console.warn("⚡ DEV MODE: Using mock admin dashboard data")
-
-        setWithdrawals(DEV_WITHDRAWALS)
-        setConfig(DEV_CONFIG)
-        setPlatformFee(DEV_CONFIG.platform_fee_percentage.toString())
-        return
-      }
-
-      // ============================
-      // PROD MODE → Backend Real Data
-      // ============================
       const [withdrawalsRes, configRes] = await Promise.all([
         api.get<Withdrawal[]>(API_ROUTES.GET_ALL_WITHDRAWALS),
         api.get<AppConfig>(API_ROUTES.GET_CONFIG),
@@ -120,30 +84,6 @@ export default function AdminDashboardPage() {
     notes?: string
   ) => {
     try {
-      // DEV MODE → simulate approve/reject
-      if (isDev) {
-        alert(
-          `DEV MODE: Withdrawal ${withdrawalId} ${
-            approve ? "APPROVED" : "REJECTED"
-          }`
-        )
-
-        setWithdrawals((prev) =>
-          prev.map((w) =>
-            w.id === withdrawalId
-              ? {
-                  ...w,
-                  status: approve ? "approved" : "rejected",
-                  admin_notes: notes || "",
-                }
-              : w
-          )
-        )
-
-        return
-      }
-
-      // PROD MODE → backend
       await api.post(API_ROUTES.PROCESS_WITHDRAWAL(withdrawalId), {
         approve,
         admin_notes: notes,
@@ -168,18 +108,6 @@ export default function AdminDashboardPage() {
     }
 
     try {
-      // DEV MODE → simulate config save
-      if (isDev) {
-        alert("DEV MODE: Config updated successfully")
-
-        setConfig((prev) =>
-          prev ? { ...prev, platform_fee_percentage: fee } : prev
-        )
-
-        return
-      }
-
-      // PROD MODE → backend save
       await api.post(API_ROUTES.UPDATE_CONFIG, {
         platform_fee_percentage: fee,
       })
@@ -195,6 +123,14 @@ export default function AdminDashboardPage() {
   // ============================
   // Loading UI
   // ============================
+  if (!isAuthenticated) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <p>{authMessage}</p>
+      </div>
+    )
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -203,6 +139,9 @@ export default function AdminDashboardPage() {
     )
   }
 
+  // ============================
+  // Stats
+  // ============================
   const pendingWithdrawals = withdrawals.filter((w) => w.status === "pending")
 
   const totalPendingCoins = pendingWithdrawals.reduce(
@@ -224,12 +163,6 @@ export default function AdminDashboardPage() {
           <p className="text-muted-foreground">
             Manage platform settings and withdrawals
           </p>
-
-          {isDev && (
-            <p className="text-xs text-yellow-500 mt-2">
-              ⚡ DEV MODE: Admin dashboard is using mock data
-            </p>
-          )}
         </div>
 
         {/* Stats */}
@@ -282,7 +215,9 @@ export default function AdminDashboardPage() {
             <TabsTrigger value="withdrawals">
               Withdrawal Requests
             </TabsTrigger>
-            <TabsTrigger value="settings">Platform Settings</TabsTrigger>
+            <TabsTrigger value="settings">
+              Platform Settings
+            </TabsTrigger>
           </TabsList>
 
           {/* Withdrawals */}
@@ -294,6 +229,7 @@ export default function AdminDashboardPage() {
                     <p className="font-medium">
                       @{withdrawal.host_username}
                     </p>
+
                     <span className="text-xs px-3 py-1 rounded-full bg-yellow-500/20 text-yellow-500">
                       {withdrawal.status}
                     </span>
@@ -310,12 +246,17 @@ export default function AdminDashboardPage() {
                       >
                         Approve
                       </Button>
+
                       <Button
                         size="sm"
                         variant="destructive"
                         className="flex-1"
                         onClick={() =>
-                          handleProcessWithdrawal(withdrawal.id, false, "Rejected")
+                          handleProcessWithdrawal(
+                            withdrawal.id,
+                            false,
+                            "Rejected"
+                          )
                         }
                       >
                         Reject
@@ -336,14 +277,19 @@ export default function AdminDashboardPage() {
                   Manage platform-wide settings
                 </CardDescription>
               </CardHeader>
+
               <CardContent className="space-y-4">
                 <Label>Platform Fee Percentage</Label>
+
                 <Input
                   value={platformFee}
                   onChange={(e) => setPlatformFee(e.target.value)}
                 />
 
-                <Button onClick={handleUpdateConfig} className="w-full">
+                <Button
+                  onClick={handleUpdateConfig}
+                  className="w-full"
+                >
                   Save Configuration
                 </Button>
               </CardContent>

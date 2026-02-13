@@ -3,30 +3,34 @@ import { db } from "@/lib/db"
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json()
-    const { streamId } = body
+    const { streamId } = await req.json()
 
     if (!streamId) {
       return NextResponse.json(
-        { error: "Missing streamId" },
+        { success: false, error: "streamId required" },
         { status: 400 }
       )
     }
 
     await db.query(
-      `UPDATE streams SET is_live = false WHERE id = $1`,
+      `
+      UPDATE streams
+      SET is_live = false,
+          ended_at = NOW()
+      WHERE id = $1
+      `,
       [streamId]
     )
 
     return NextResponse.json({
       success: true,
-      streamId,
+      message: "Stream ended",
     })
   } catch (err) {
-    console.error("❌ End stream error:", err)
+    console.error("❌ End Stream Error:", err)
 
     return NextResponse.json(
-      { error: "Failed to end stream" },
+      { success: false, error: "Failed to end stream" },
       { status: 500 }
     )
   }
