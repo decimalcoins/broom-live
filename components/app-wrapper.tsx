@@ -1,28 +1,30 @@
 "use client"
 
-import type { ReactNode } from "react"
-import { PiAuthProvider, usePiAuth } from "@/contexts/pi-auth-context"
-import { AuthLoadingScreen } from "./auth-loading-screen"
-import { PiBrowserRequired } from "./pi-browser-required"
+import { useEffect, useState } from "react"
+import { usePiAuth } from "@/contexts/pi-auth-context"
+import { PiBrowserRequired } from "@/components/pi-browser-required"
+import { AuthLoadingScreen } from "@/components/auth-loading-screen"
 
-function AppContent({ children }: { children: ReactNode }) {
-  const { isAuthenticated } = usePiAuth()
+export function AppWrapper({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, authMessage } = usePiAuth()
 
-  if (!window?.Pi) {
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) {
+    return <AuthLoadingScreen message="Loading..." />
+  }
+
+  if (!(window as any).Pi) {
     return <PiBrowserRequired />
   }
 
   if (!isAuthenticated) {
-    return <AuthLoadingScreen />
+    return <AuthLoadingScreen message={authMessage} />
   }
 
   return <>{children}</>
-}
-
-export function AppWrapper({ children }: { children: ReactNode }) {
-  return (
-    <PiAuthProvider>
-      <AppContent>{children}</AppContent>
-    </PiAuthProvider>
-  )
 }
