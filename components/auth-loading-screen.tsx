@@ -1,41 +1,71 @@
-"use client";
+"use client"
 
-import { usePiAuth } from "@/contexts/pi-auth-context";
+import Image from "next/image"
+import { usePiAuth } from "@/contexts/pi-auth-context"
+import { Button } from "@/components/ui/button"
 
-export function AuthLoadingScreen() {
-  const { authMessage, reinitialize } = usePiAuth();
-  const isError = authMessage.toLowerCase().includes("failed");
+interface AuthLoadingScreenProps {
+  message?: string
+}
+
+export function AuthLoadingScreen({ message }: AuthLoadingScreenProps) {
+  const { authMessage, reinitialize } = usePiAuth()
+
+  const finalMessage = message || authMessage
+
+  const isError =
+    finalMessage.toLowerCase().includes("failed") ||
+    finalMessage.toLowerCase().includes("error")
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-white">
       <div className="max-w-md w-full px-6 text-center space-y-6">
-        <div className="flex justify-center">
-          <div className="relative">
-            <div className="w-20 h-20 rounded-full border-4 border-primary/20" />
-            <div className="absolute inset-0 w-20 h-20 rounded-full border-4 border-primary border-t-transparent animate-spin" />
-          </div>
+        
+        {/* ✅ LOGO */}
+        <div className="flex justify-center animate-fade-in">
+          <Image
+            src="/logo.png"
+            alt="Broom Live"
+            width={180}
+            height={180}
+            priority
+          />
         </div>
 
+        {/* ✅ SPINNER */}
+        {!isError && (
+          <div className="flex justify-center">
+            <div className="relative">
+              <div className="w-16 h-16 rounded-full border-4 border-primary/20" />
+              <div className="absolute inset-0 w-16 h-16 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+            </div>
+          </div>
+        )}
+
+        {/* ✅ MESSAGE */}
         <div className="space-y-2">
-          <h2 className="text-2xl font-semibold">Pi Network Authentication</h2>
+          <h2 className="text-xl font-semibold">
+            {isError
+              ? "Authentication Failed"
+              : "Connecting to Pi Network..."}
+          </h2>
+
           <p
             className={`text-sm ${
               isError ? "text-destructive" : "text-muted-foreground"
             }`}
           >
-            {authMessage}
+            {finalMessage}
           </p>
         </div>
 
+        {/* ✅ RETRY */}
         {isError && (
-          <button
-            onClick={reinitialize}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
-          >
+          <Button onClick={reinitialize} className="w-full">
             Try Again
-          </button>
+          </Button>
         )}
       </div>
     </div>
-  );
+  )
 }
