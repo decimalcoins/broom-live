@@ -1,14 +1,27 @@
 // lib/pi-browser.ts
 
-export function isPiBrowser(): boolean {
-  if (typeof window === "undefined") return false;
+export async function waitForPiSDK(
+  timeoutMs: number = 4000
+): Promise<boolean> {
+  if (typeof window === "undefined") return false
 
-  // Pi Browser inject object window.Pi
-  if ((window as any).Pi) return true;
+  const start = Date.now()
 
-  // optional: userAgent check
-  const ua = navigator.userAgent.toLowerCase();
-  if (ua.includes("pibrowser")) return true;
+  return new Promise((resolve) => {
+    const check = () => {
+      if ((window as any).Pi) {
+        console.log("✅ Pi SDK detected")
+        return resolve(true)
+      }
 
-  return false;
+      if (Date.now() - start > timeoutMs) {
+        console.log("❌ Pi SDK not found after timeout")
+        return resolve(false)
+      }
+
+      setTimeout(check, 200)
+    }
+
+    check()
+  })
 }
