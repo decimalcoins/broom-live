@@ -26,7 +26,6 @@ export function StreamWithChat({ stream }: StreamWithChatProps) {
   // ======================================================
   const handleGiftReceived = (gift: GiftEvent) => {
     console.log("🎁 Gift Animation Triggered:", gift)
-
     setActiveGifts((prev) => [...prev, gift])
   }
 
@@ -40,10 +39,8 @@ export function StreamWithChat({ stream }: StreamWithChatProps) {
   useEffect(() => {
     const onGiftEvent = (event: any) => {
       const msg = event.detail
-
       if (!msg || msg.type !== "gift") return
 
-      // msg.data = gift payload
       handleGiftReceived(msg.data)
     }
 
@@ -55,33 +52,15 @@ export function StreamWithChat({ stream }: StreamWithChatProps) {
   }, [])
 
   // ======================================================
-  // ✅ Gift Sent Handler
+  // ✅ Gift Sent Handler (REAL)
   // ======================================================
-  const handleGiftSent = (giftCost?: number) => {
-    // DEV MODE → simulate balance update
-    if (process.env.NEXT_PUBLIC_APP_MODE === "dev") {
-      console.warn("⚡ DEV MODE: Simulating gift sent")
+  const handleGiftSent = async (giftCost?: number) => {
+    if (!giftCost) return
 
-      if (giftCost) {
-        setCoinBalance((prev) => Math.max(prev - giftCost, 0))
-      }
+    // Update local balance instantly
+    setCoinBalance((prev) => Math.max(prev - giftCost, 0))
 
-      // Fake gift animation test
-      handleGiftReceived({
-        id: `dev-gift-${Date.now()}`,
-        sender_username: userData?.username || "Developer",
-        gift: {
-          id: "mock",
-          name: "Mock Gift 🎁",
-          coin_cost: giftCost || 10,
-          image_url: "🎁",
-        },
-      } as any)
-
-      return
-    }
-
-    console.log("Gift sent → refresh balance later")
+    console.log("🎁 Gift sent successfully!")
   }
 
   // ======================================================
@@ -105,7 +84,7 @@ export function StreamWithChat({ stream }: StreamWithChatProps) {
         <GiftPicker
           streamId={stream.id}
           hostId={stream.host_id}
-          onGiftSent={() => handleGiftSent(10)}
+          onGiftSent={(giftCost) => handleGiftSent(giftCost)}
         />
       </div>
 
