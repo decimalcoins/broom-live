@@ -25,7 +25,7 @@ export function useLiveKit(
   const [cameraEnabled, setCameraEnabled] = useState(false)
   const [micEnabled, setMicEnabled] = useState(false)
 
-  // ✅ Service harus persistent (tidak recreate tiap render)
+  // ✅ Service persistent
   const serviceRef = useRef<LiveKitService | null>(null)
 
   if (!serviceRef.current) {
@@ -55,24 +55,18 @@ export function useLiveKit(
 
       console.log("✅ LiveKit Connected!")
 
-      // ============================
-      // ✅ ONLY HOST CAN PUBLISH
-      // ============================
+      // ✅ HOST publish cam+mic
       if (role === "host") {
-        console.log("🎥 Host: enabling camera...")
+        console.log("🎥 Host enabling camera...")
         await connectedRoom.localParticipant.setCameraEnabled(true)
         setCameraEnabled(true)
 
-        console.log("🎤 Host: enabling microphone...")
+        console.log("🎤 Host enabling mic...")
         await connectedRoom.localParticipant.setMicrophoneEnabled(true)
         setMicEnabled(true)
-      } else {
-        console.log("👀 Viewer: publish disabled")
       }
 
-      // ============================
-      // ROOM EVENTS
-      // ============================
+      // Room events
       connectedRoom.on(RoomEvent.Connected, () => {
         console.log("✅ Room connected")
         setIsConnected(true)
@@ -144,6 +138,28 @@ export function useLiveKit(
     setMicEnabled(enabled)
   }, [room, micEnabled, role])
 
+  // ============================
+  // ✅ SEND DATA (GIFTS / CHAT)
+  // ============================
+  const sendData = useCallback(
+    (message: any) => {
+      if (!room) return
+
+      try {
+        const payload = new TextEncoder().encode(JSON.stringify(message))
+
+        room.localParticipant.publishData(payload, {
+          reliable: true,
+        })
+
+        console.log("📨 Data sent:", message)
+      } catch (err) {
+        console.error("❌ Failed to send data:", err)
+      }
+    },
+    [room]
+  )
+
   // Cleanup
   useEffect(() => {
     return () => disconnect()
@@ -159,6 +175,9 @@ export function useLiveKit(
     micEnabled,
     toggleCamera,
     toggleMic,
+
+    // realtime data channel
+    sendData,
 
     connect,
     disconnect,
