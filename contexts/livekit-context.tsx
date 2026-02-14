@@ -15,7 +15,7 @@ export function LiveKitProvider({
   room,
   children,
 }: {
-  room: Room | null
+  room: Room
   children: React.ReactNode
 }) {
   return (
@@ -25,6 +25,17 @@ export function LiveKitProvider({
   )
 }
 
+/**
+ * ✅ New Standard Hook
+ */
+export function useLiveKitRoom() {
+  return useContext(LiveKitContext)
+}
+
+/**
+ * ✅ Backward Compatible Hook
+ * (so old code doesn't break)
+ */
 export function useLiveKitContext() {
   return useContext(LiveKitContext)
 }

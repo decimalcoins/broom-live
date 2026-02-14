@@ -18,7 +18,7 @@ import { ChatPanel } from "./chat-panel"
 import { GiftAnimation } from "./gift-animation"
 
 interface HostStreamViewProps {
-  streamId: number
+  streamId: string
   onEndStream: () => void
 }
 
@@ -33,7 +33,7 @@ export function HostStreamView({ streamId, onEndStream }: HostStreamViewProps) {
   const [tokenError, setTokenError] = useState<string | null>(null)
 
   // ===============================
-  // ✅ ROOM NAME (SAFE)
+  // ✅ ROOM NAME SAFE (UID)
   // ===============================
   const roomName = userData?.uid ? `broom_${userData.uid}` : null
 
@@ -91,20 +91,17 @@ export function HostStreamView({ streamId, onEndStream }: HostStreamViewProps) {
   }, [roomName, userData?.username])
 
   // ===============================
-  // ✅ CONNECT ROOM ON TOKEN READY
+  // ✅ CONNECT ROOM
   // ===============================
   useEffect(() => {
     if (!token) return
 
     connect()
-
-    return () => {
-      disconnect()
-    }
+    return () => disconnect()
   }, [token, connect, disconnect])
 
   // ===============================
-  // ✅ AUTO ENABLE CAMERA + MIC ONCE
+  // ✅ AUTO ENABLE CAMERA + MIC
   // ===============================
   useEffect(() => {
     if (!room || !isConnected) return
@@ -137,20 +134,17 @@ export function HostStreamView({ streamId, onEndStream }: HostStreamViewProps) {
     }
 
     room.on("dataReceived", handleData)
-
-    return () => {
-      room.off("dataReceived", handleData)
-    }
+    return () => room.off("dataReceived", handleData)
   }, [room, addCoins])
 
   // ===============================
-  // ✅ FINAL END STREAM
+  // ✅ END STREAM
   // ===============================
   const handleEndStream = async () => {
     if (!userData || !room) return
 
     try {
-      // 1. Broadcast END event to viewers
+      // Broadcast END event
       room.localParticipant.publishData(
         new TextEncoder().encode(
           JSON.stringify({
@@ -161,9 +155,7 @@ export function HostStreamView({ streamId, onEndStream }: HostStreamViewProps) {
         { reliable: true }
       )
 
-      console.log("📢 Stream end broadcast sent")
-
-      // 2. Update DB stream status
+      // Update DB stream status
       await fetch("/api/streams/end", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -172,13 +164,10 @@ export function HostStreamView({ streamId, onEndStream }: HostStreamViewProps) {
           userId: userData.id,
         }),
       })
-
-      console.log("🛑 Stream ended in DB")
     } catch (err) {
       console.error("End stream failed:", err)
     }
 
-    // Disconnect + return dashboard
     disconnect()
     onEndStream()
   }
@@ -226,11 +215,7 @@ export function HostStreamView({ streamId, onEndStream }: HostStreamViewProps) {
       <div className="flex flex-col h-screen bg-black relative">
         {/* VIDEO */}
         {localVideoTrack ? (
-          <VideoPlayer
-            track={localVideoTrack}
-            isLocal
-            className="w-full h-full"
-          />
+          <VideoPlayer track={localVideoTrack} isLocal />
         ) : (
           <div className="flex items-center justify-center h-full text-white">
             <p>📷 Camera is off</p>
@@ -246,15 +231,19 @@ export function HostStreamView({ streamId, onEndStream }: HostStreamViewProps) {
           </Card>
         </div>
 
-        {/* GIFT ANIMATION */}
-        {giftEvent && <GiftAnimation gift={giftEvent.gift} />}
+        {/* 🎁 GIFT */}
+        {giftEvent && (
+          <GiftAnimation
+            gift={giftEvent.gift}
+            onComplete={() => setGiftEvent(null)}
+          />
+        )}
 
-        {/* CHAT */}
-        <ChatPanel />
+        {/* 💬 CHAT */}
+        <ChatPanel username={userData?.username || "Host"} />
 
         {/* CONTROLS */}
         <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-4">
-          {/* CAMERA */}
           <Button
             size="lg"
             variant={cameraEnabled ? "default" : "destructive"}
@@ -264,7 +253,6 @@ export function HostStreamView({ streamId, onEndStream }: HostStreamViewProps) {
             {cameraEnabled ? <Video /> : <VideoOff />}
           </Button>
 
-          {/* MIC */}
           <Button
             size="lg"
             variant={micEnabled ? "default" : "destructive"}
@@ -274,7 +262,6 @@ export function HostStreamView({ streamId, onEndStream }: HostStreamViewProps) {
             {micEnabled ? <Mic /> : <MicOff />}
           </Button>
 
-          {/* END */}
           <Button
             size="lg"
             variant="destructive"

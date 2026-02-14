@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react"
 import { RoomEvent } from "livekit-client"
-import { useLiveKitContext } from "@/contexts/livekit-context"
+
+import { useLiveKitRoom } from "@/contexts/livekit-context"
 
 import { Input } from "./ui/input"
 import { Button } from "./ui/button"
@@ -19,7 +20,7 @@ interface ChatPanelProps {
 }
 
 export function ChatPanel({ username }: ChatPanelProps) {
-  const { room } = useLiveKitContext()
+  const { room } = useLiveKitRoom()
 
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [text, setText] = useState("")
@@ -34,7 +35,7 @@ export function ChatPanel({ username }: ChatPanelProps) {
   }, [messages])
 
   // ============================
-  // ✅ Listen Incoming DataChannel Messages
+  // ✅ Listen Incoming Messages
   // ============================
   useEffect(() => {
     if (!room) return
@@ -97,7 +98,7 @@ export function ChatPanel({ username }: ChatPanelProps) {
   }
 
   return (
-    <div className="absolute bottom-4 left-4 w-[320px] flex flex-col gap-2">
+    <div className="absolute bottom-4 left-4 w-[320px] flex flex-col gap-2 z-50">
       {/* Chat Messages */}
       <Card className="bg-black/50 border-white/10 text-white p-3 h-[240px] overflow-y-auto rounded-2xl">
         <div className="flex flex-col gap-2 text-sm">

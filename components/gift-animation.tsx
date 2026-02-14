@@ -5,7 +5,7 @@ import type { GiftEvent } from "@/lib/types"
 
 interface GiftAnimationProps {
   gift: GiftEvent
-  onComplete: () => void
+  onComplete?: () => void
 }
 
 export function GiftAnimation({ gift, onComplete }: GiftAnimationProps) {
@@ -14,7 +14,9 @@ export function GiftAnimation({ gift, onComplete }: GiftAnimationProps) {
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsVisible(false)
-      onComplete()
+
+      // ✅ Only call if provided
+      if (onComplete) onComplete()
     }, 3000)
 
     return () => clearTimeout(timer)
@@ -26,9 +28,6 @@ export function GiftAnimation({ gift, onComplete }: GiftAnimationProps) {
   // ✅ SAFE FALLBACK SUPPORT
   // ============================
 
-  // Backend gift format: gift.gift.image_url
-  // DEV mock format: gift.image_url
-
   const giftIcon =
     (gift as any)?.gift?.image_url ||
     (gift as any)?.image_url ||
@@ -39,9 +38,7 @@ export function GiftAnimation({ gift, onComplete }: GiftAnimationProps) {
     (gift as any)?.gift_name ||
     "Gift"
 
-  const sender =
-    (gift as any)?.sender_username ||
-    "Someone"
+  const sender = (gift as any)?.sender_username || "Someone"
 
   return (
     <div className="fixed inset-0 pointer-events-none z-50 flex items-center justify-center animate-in fade-in zoom-in duration-300">
@@ -50,9 +47,7 @@ export function GiftAnimation({ gift, onComplete }: GiftAnimationProps) {
 
         <p className="text-2xl font-bold mb-1">{giftName}</p>
 
-        <p className="text-lg text-white/70">
-          from @{sender}
-        </p>
+        <p className="text-lg text-white/70">from @{sender}</p>
       </div>
     </div>
   )

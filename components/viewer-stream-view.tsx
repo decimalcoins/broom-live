@@ -33,7 +33,7 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
   const { room, connect, disconnect, isConnected } = useLiveKit(roomName, token)
 
   // ============================
-  // ✅ FETCH VIEWER TOKEN (PER STREAM)
+  // ✅ FETCH VIEWER TOKEN
   // ============================
   useEffect(() => {
     if (!roomName) return
@@ -43,17 +43,15 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
         setLoadingToken(true)
         setTokenError(null)
 
-        const res = await fetch(
-          `/api/streams/${stream.id}/viewer-token`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              roomName,
-              identity: `viewer-${Date.now()}`,
-            }),
-          }
-        )
+        const res = await fetch("/api/livekit/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            roomName,
+            identity: `viewer-${Date.now()}`,
+            role: "viewer",
+          }),
+        })
 
         const data = await res.json()
 
@@ -71,7 +69,7 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
     }
 
     fetchToken()
-  }, [roomName, stream.id])
+  }, [roomName])
 
   // ============================
   // ✅ CONNECT ROOM
@@ -80,12 +78,11 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
     if (!token) return
 
     connect()
-
     return () => disconnect()
   }, [token, connect, disconnect])
 
   // ============================
-  // ✅ LISTEN STREAM END EVENT
+  // ✅ LISTEN STREAM END + GIFTS
   // ============================
   useEffect(() => {
     if (!room) return
@@ -94,6 +91,7 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
       try {
         const msg = JSON.parse(new TextDecoder().decode(payload))
 
+        // 🛑 Stream End Event
         if (msg.type === "stream_end") {
           alert("🛑 Stream has ended")
 
@@ -116,7 +114,9 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
 
     room.on("dataReceived", handleData)
 
-    return () => room.off("dataReceived", handleData)
+    return () => {
+      room.off("dataReceived", handleData)
+    }
   }, [room, disconnect, router])
 
   // ============================
@@ -164,13 +164,13 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
   }
 
   // ============================
-  // HOST VIDEO TRACK
+  // HOST VIDEO TRACK PUBLICATION
   // ============================
-  const publication =
-    hostParticipant.getTrackPublication(Track.Source.Camera)
+  const publication = hostParticipant.getTrackPublication(
+    Track.Source.Camera
+  )
 
-  const videoTrack = publication?.track
-  const viewerCount = remoteParticipants.length
+  const viewerCount = remoteParticipants.length + 1
 
   // ============================
   // MAIN UI
@@ -178,9 +178,9 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
   return (
     <div className="flex flex-col h-screen bg-black relative">
       {/* VIDEO */}
-      {videoTrack ? (
+      {publication ? (
         <VideoPlayer
-          track={videoTrack}
+          track={publication}
           participant={hostParticipant}
           className="w-full h-full"
         />

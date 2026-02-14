@@ -1,32 +1,38 @@
 "use client"
 
 import { useEffect, useRef } from "react"
-import type { RemoteTrackPublication, RemoteParticipant } from "livekit-client"
+import type { VideoTrack } from "livekit-client"
 
 interface VideoPlayerProps {
-  track: RemoteTrackPublication | null
-  participant?: RemoteParticipant
+  track: VideoTrack | null
   isLocal?: boolean
   className?: string
 }
 
-export function VideoPlayer({ track, participant, isLocal = false, className = "" }: VideoPlayerProps) {
+export function VideoPlayer({
+  track,
+  isLocal = false,
+  className = "",
+}: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
 
   useEffect(() => {
     if (!videoRef.current || !track) return
 
-    const videoTrack = track.videoTrack
-    if (!videoTrack) return
-
-    videoTrack.attach(videoRef.current)
+    track.attach(videoRef.current)
 
     return () => {
-      videoTrack.detach()
+      track.detach()
     }
   }, [track])
 
   return (
-    <video ref={videoRef} className={`w-full h-full object-cover ${className}`} autoPlay playsInline muted={isLocal} />
+    <video
+      ref={videoRef}
+      autoPlay
+      playsInline
+      muted={isLocal}
+      className={`w-full h-full object-cover ${className}`}
+    />
   )
 }
