@@ -1,11 +1,11 @@
 import type React from "react"
 import type { Metadata } from "next"
+import Script from "next/script"
 
 import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
 
 import "./globals.css"
-
 import { Providers } from "@/components/providers"
 
 export const metadata: Metadata = {
@@ -21,6 +21,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        {/* ✅ Load Pi Network SDK */}
+        <Script
+          src="https://sdk.minepi.com/pi-sdk.js"
+          strategy="beforeInteractive"
+        />
+
+        {/* ✅ Fonts */}
         <style>{`
           html {
             font-family: ${GeistSans.style.fontFamily};
@@ -31,7 +38,6 @@ export default function RootLayout({
       </head>
 
       <body>
-        {/* ✅ All client providers here */}
         <Providers>{children}</Providers>
       </body>
     </html>
