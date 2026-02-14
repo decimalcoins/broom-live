@@ -1,62 +1,49 @@
 import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
-import crypto from "crypto"
 
 export async function POST(req: Request) {
   try {
-    const { streamId, senderId, giftAmount } = await req.json()
+    const body = await req.json()
 
-    if (!streamId || !senderId || !giftAmount) {
+    const { streamId, senderId, hostId, giftId } = body
+
+    if (!streamId || !senderId || !hostId || !giftId) {
       return NextResponse.json(
-        { success: false, error: "streamId, senderId, giftAmount required" },
+        { success: false, error: "Missing required fields" },
         { status: 400 }
       )
     }
 
-    if (giftAmount <= 0) {
-      return NextResponse.json(
-        { success: false, error: "Invalid gift amount" },
-        { status: 400 }
-      )
-    }
-
-    // ============================
-    // ✅ CHECK STREAM LIVE
-    // ============================
-    const streamRes = await db.query(
+    // ================================
+    // 1. Load Gift Info
+    // ================================
+    const giftRes = await db.query(
       `
-      SELECT id, host_id, is_live
-      FROM streams
+      SELECT id, name, coin_cost, image_url
+      FROM gifts
       WHERE id=$1
       LIMIT 1
       `,
-      [streamId]
+      [giftId]
     )
 
-    const stream = streamRes.rows[0]
+    const gift = giftRes.rows[0]
 
-    if (!stream) {
+    if (!gift) {
       return NextResponse.json(
-        { success: false, error: "Stream not found" },
+        { success: false, error: "Gift not found" },
         { status: 404 }
       )
     }
 
-    if (!stream.is_live) {
-      return NextResponse.json(
-        { success: false, error: "Stream is not live" },
-        { status: 400 }
-      )
-    }
+    const cost = gift.coin_cost
 
-    const hostId = stream.host_id
-
-    // ============================
-    // ✅ CHECK VIEWER BALANCE
-    // ============================
+    // ================================
+    // 2. Check Sender Coin Balance
+    // ================================
     const senderRes = await db.query(
       `
-      SELECT id, coin_balance
+      SELECT id, username, coin_balance
       FROM users
       WHERE id=$1
       LIMIT 1
@@ -73,95 +60,102 @@ export async function POST(req: Request) {
       )
     }
 
-    if (sender.coin_balance < giftAmount) {
+    if (sender.coin_balance < cost) {
       return NextResponse.json(
         { success: false, error: "Not enough coins" },
         { status: 400 }
       )
     }
 
-    // ============================
-    // ✅ ATOMIC TRANSFER
-    // ============================
-    await db.query("BEGIN")
-
-    // Deduct sender coins
+    // ================================
+    // 3. Deduct Coins from Viewer
+    // ================================
     await db.query(
       `
       UPDATE users
       SET coin_balance = coin_balance - $1
       WHERE id=$2
       `,
-      [giftAmount, senderId]
+      [cost, senderId]
     )
 
-    // Add host coins
+    // ================================
+    // 4. Add Coins to Host
+    // ================================
     await db.query(
       `
       UPDATE users
       SET coin_balance = coin_balance + $1
       WHERE id=$2
       `,
-      [giftAmount, hostId]
+      [cost, hostId]
     )
 
-    // ============================
-    // ✅ TRANSACTION LOG (Sender)
-    // ============================
-    const txSenderId = crypto.randomUUID()
+    // ================================
+    // 5. Insert Gift Event
+    // ================================
+    const eventRes = await db.query(
+      `
+      INSERT INTO gift_events (
+        stream_id,
+        sender_id,
+        host_id,
+        gift_id,
+        coin_amount
+      )
+      VALUES ($1,$2,$3,$4,$5)
+      RETURNING *
+      `,
+      [streamId, senderId, hostId, giftId, cost]
+    )
 
+    const giftEvent = eventRes.rows[0]
+
+    // ================================
+    // 6. Insert Transactions
+    // ================================
+
+    // Sender transaction (spent)
     await db.query(
       `
-      INSERT INTO transactions (
-        id,
-        user_id,
-        type,
-        amount,
-        currency,
-        related_user_id,
-        stream_id,
-        created_at
-      )
-      VALUES ($1,$2,'gift_sent',$3,'coin',$4,$5,NOW())
+      INSERT INTO transactions (user_id, type, amount, currency)
+      VALUES ($1,'gift_sent',$2,'COIN')
       `,
-      [txSenderId, senderId, giftAmount, hostId, streamId]
+      [senderId, cost]
     )
 
-    // ============================
-    // ✅ TRANSACTION LOG (Host)
-    // ============================
-    const txHostId = crypto.randomUUID()
-
+    // Host transaction (earned)
     await db.query(
       `
-      INSERT INTO transactions (
-        id,
-        user_id,
-        type,
-        amount,
-        currency,
-        related_user_id,
-        stream_id,
-        created_at
-      )
-      VALUES ($1,$2,'gift_received',$3,'coin',$4,$5,NOW())
+      INSERT INTO transactions (user_id, type, amount, currency)
+      VALUES ($1,'gift_received',$2,'COIN')
       `,
-      [txHostId, hostId, giftAmount, senderId, streamId]
+      [hostId, cost]
     )
 
-    await db.query("COMMIT")
-
+    // ================================
+    // 7. Return Response
+    // ================================
     return NextResponse.json({
       success: true,
-      message: "🎁 Gift sent successfully!",
+      message: "Gift sent successfully",
+      data: {
+        id: giftEvent.id,
+        stream_id: streamId,
+        sender_username: sender.username,
+        gift: {
+          id: gift.id,
+          name: gift.name,
+          coin_cost: cost,
+          image_url: gift.image_url,
+        },
+      },
     })
-  } catch (err: any) {
-    await db.query("ROLLBACK")
-
-    console.error("❌ GIFT SEND ERROR:", err)
+  } catch (err) {
+    console.error("❌ SEND GIFT ERROR:", err)
 
     return NextResponse.json(
-      { success: false, error: err.message || "Gift failed" },
+      { success: false, error: "Failed to send gift" },
       { status: 500 }
     )
   }

@@ -1,113 +1,100 @@
 import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
-import { verifyPiToken } from "@/lib/pi/verify-token"
 
-export async function GET(req: Request) {
-  const client = await db.connect()
-
+export async function POST(req: Request) {
   try {
-    // ============================
-    // ✅ ACCESS TOKEN REQUIRED
-    // ============================
-    const accessToken =
-      req.headers.get("Authorization")?.replace("Bearer ", "") || null
+    const { uid } = await req.json()
 
-    if (!accessToken) {
+    if (!uid) {
       return NextResponse.json(
-        { success: false, error: "Missing Pi Access Token" },
-        { status: 401 }
+        { success: false, error: "uid required" },
+        { status: 400 }
       )
     }
 
     // ============================
-    // ✅ VERIFY TOKEN TO PI SERVER
+    // 1. Cari user
     // ============================
-    const piUser = await verifyPiToken(accessToken)
-
-    if (!piUser?.uid) {
-      return NextResponse.json(
-        { success: false, error: "Invalid Pi Token" },
-        { status: 401 }
-      )
-    }
-
-    const uid = piUser.uid
-    const username = piUser.username
-
-    // ============================
-    // ✅ CHECK USER EXISTS
-    // ============================
-    const userRes = await client.query(
+    const res = await db.query(
       `
       SELECT *
       FROM users
-      WHERE id=$1
+      WHERE uid=$1
       LIMIT 1
       `,
       [uid]
     )
 
+    let user = res.rows[0]
+
     // ============================
-    // ✅ USER EXISTS → RETURN
+    // 2. Kalau user belum ada → create
     // ============================
-    if (userRes.rows.length > 0) {
-      return NextResponse.json({
-        success: true,
-        user: userRes.rows[0],
-      })
+    if (!user) {
+      const createRes = await db.query(
+        `
+        INSERT INTO users (uid, username, role, coin_balance, login_order)
+        VALUES ($1, $2, 'USER', 0, 0)
+        RETURNING *
+        `,
+        [uid, "Pioneer"]
+      )
+
+      user = createRes.rows[0]
     }
 
     // ============================
-    // ✅ NEW USER → CREATE
+    // 3. Auto increment login_order
     // ============================
-
-    // login_order auto increment
-    const orderRes = await client.query(
-      `SELECT COUNT(*)::int AS total FROM users`
-    )
-
-    const loginOrder = orderRes.rows[0].total + 1
-
-    const newUserRes = await client.query(
+    const updatedLogin = await db.query(
       `
-      INSERT INTO users (
-        id,
-        username,
-        role,
-        coin_balance,
-        pi_balance,
-        login_order,
-        created_at,
-        updated_at
-      )
-      VALUES (
-        $1,
-        $2,
-        'viewer',
-        0,
-        0,
-        $3,
-        NOW(),
-        NOW()
-      )
-      RETURNING *
+      UPDATE users
+      SET login_order = login_order + 1
+      WHERE id=$1
+      RETURNING login_order
       `,
-      [uid, username, loginOrder]
+      [user.id]
     )
 
+    user.login_order = updatedLogin.rows[0].login_order
+
+    // ============================
+    // 4. AUTO HOST UNLOCK (Login 1–100)
+    // ============================
+    if (user.login_order <= 100 && user.role !== "HOST") {
+      console.log("🔥 Auto unlock host for:", user.username)
+
+      // Bonus coins
+      const bonusCoins = 50000
+
+      const hostRes = await db.query(
+        `
+        UPDATE users
+        SET role='HOST',
+            coin_balance = coin_balance + $1
+        WHERE id=$2
+        RETURNING *
+        `,
+        [bonusCoins, user.id]
+      )
+
+      user = hostRes.rows[0]
+    }
+
+    // ============================
+    // 5. Return
+    // ============================
     return NextResponse.json({
       success: true,
-      message: "New Pi user created",
-      user: newUserRes.rows[0],
+      user,
+      can_host: user.role === "HOST",
     })
-  } catch (err: any) {
-    console.error("❌ /api/user/me ERROR:", err)
+  } catch (err) {
+    console.error("❌ /me error:", err)
 
     return NextResponse.json(
-      { success: false, error: err.message || "User fetch failed" },
+      { success: false, error: "Failed to load user" },
       { status: 500 }
     )
-  } finally {
-    client.release()
   }
 }

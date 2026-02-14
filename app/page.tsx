@@ -6,14 +6,19 @@ import { useRouter } from "next/navigation"
 import { usePiAuth } from "@/contexts/pi-auth-context"
 import { useCoins } from "@/contexts/coin-context"
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+
 import { Button } from "@/components/ui/button"
 
 import { Video, Users } from "lucide-react"
 
-import { api } from "@/lib/api"
 import { API_ROUTES } from "@/lib/api-routes"
-
 import type { Stream } from "@/lib/types"
 
 import { CoinBalance } from "@/components/coin-balance"
@@ -28,34 +33,48 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true)
 
   // ============================
-  // Load Live Streams
+  // ✅ Load Live Streams
   // ============================
   useEffect(() => {
     fetchLiveStreams()
   }, [])
 
+  // ============================
+  // ✅ Fetch LIVE STREAMS Correctly
+  // ============================
   const fetchLiveStreams = async () => {
     setLoading(true)
 
     try {
-      const response = await api.get<Stream[]>(
-        `${API_ROUTES.GET_STREAMS}?is_live=true`
-      )
+      const res = await fetch(API_ROUTES.LIVE_STREAMS, {
+        cache: "no-store",
+      })
 
-      setLiveStreams(response.data)
+      const data = await res.json()
+
+      console.log("📡 LIVE STREAM RESPONSE:", data)
+
+      if (data.success) {
+        setLiveStreams(data.streams)
+      } else {
+        setLiveStreams([])
+      }
     } catch (err) {
-      console.error("❌ Failed to fetch streams:", err)
+      console.error("❌ Failed to fetch live streams:", err)
+      setLiveStreams([])
     } finally {
       setLoading(false)
     }
   }
 
+  // ============================
+  // ✅ UI Render
+  // ============================
   return (
     <div className="min-h-screen bg-background">
       {/* HEADER */}
       <header className="border-b bg-card">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          
           {/* Logo */}
           <div className="flex items-center gap-2">
             <Video className="w-8 h-8 text-primary" />
@@ -64,7 +83,7 @@ export default function HomePage() {
 
           {/* Right */}
           <div className="flex items-center gap-3">
-            {/* Coin Balance realtime */}
+            {/* Coin Balance */}
             <CoinBalance balance={balance} />
 
             {/* Host Dashboard */}
@@ -92,7 +111,6 @@ export default function HomePage() {
 
       {/* MAIN */}
       <main className="container mx-auto px-4 py-8">
-        
         {/* Top Section */}
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -102,7 +120,7 @@ export default function HomePage() {
             </p>
           </div>
 
-          <BuyCoinsDialog onSuccess={() => fetchLiveStreams()} />
+          <BuyCoinsDialog onSuccess={fetchLiveStreams} />
         </div>
 
         {/* CONTENT */}
@@ -114,9 +132,11 @@ export default function HomePage() {
           <Card>
             <CardContent className="py-12 text-center">
               <Video className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
+
               <h3 className="text-xl font-semibold mb-2">
                 No Live Streams
               </h3>
+
               <p className="text-muted-foreground mb-4">
                 Check back later or start your own stream!
               </p>
@@ -136,9 +156,8 @@ export default function HomePage() {
                 className="cursor-pointer hover:shadow-lg transition-shadow"
                 onClick={() => router.push(`/stream/${stream.id}`)}
               >
+                {/* Thumbnail */}
                 <CardHeader className="relative p-0">
-                  
-                  {/* Thumbnail */}
                   <div className="aspect-video bg-muted flex items-center justify-center rounded-t-lg">
                     <Video className="w-16 h-16 text-muted-foreground" />
                   </div>
@@ -155,6 +174,7 @@ export default function HomePage() {
                   </div>
                 </CardHeader>
 
+                {/* Info */}
                 <CardContent className="p-4">
                   <CardTitle className="text-lg mb-1">
                     {stream.title}
