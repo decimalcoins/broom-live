@@ -1,6 +1,14 @@
 "use client"
 
-import { createContext, useContext, useState, type ReactNode } from "react"
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react"
+
+import { usePiAuth } from "@/contexts/pi-auth-context"
 
 interface CoinContextType {
   balance: number
@@ -10,15 +18,24 @@ interface CoinContextType {
 
 const CoinContext = createContext<CoinContextType | undefined>(undefined)
 
-export function CoinProvider({
-  children,
-  initialBalance = 0,
-}: {
-  children: ReactNode
-  initialBalance?: number
-}) {
-  const [balance, setBalance] = useState(initialBalance)
+export function CoinProvider({ children }: { children: ReactNode }) {
+  const { userData } = usePiAuth()
 
+  const [balance, setBalance] = useState(0)
+
+  // ==========================================
+  // ✅ AUTO SYNC COIN BALANCE AFTER LOGIN
+  // ==========================================
+  useEffect(() => {
+    if (userData?.coin_balance !== undefined) {
+      console.log("✅ Sync coin balance from user:", userData.coin_balance)
+      setBalance(userData.coin_balance)
+    }
+  }, [userData])
+
+  // ==========================================
+  // ✅ ADD COINS (Realtime Gift Reward)
+  // ==========================================
   const addCoins = (amount: number) => {
     setBalance((prev) => prev + amount)
   }

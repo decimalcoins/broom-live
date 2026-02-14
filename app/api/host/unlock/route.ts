@@ -47,7 +47,7 @@ export async function POST(req: Request) {
     await client.query("BEGIN")
 
     // ============================
-    // ✅ CHECK USER ROLE
+    // ✅ LOCK USER ROW
     // ============================
     const userRes = await client.query(
       `
@@ -69,7 +69,10 @@ export async function POST(req: Request) {
       )
     }
 
-    if (user.role === "HOST") {
+    // ✅ Normalize role
+    const role = String(user.role).toUpperCase()
+
+    if (role === "HOST") {
       await client.query("ROLLBACK")
       return NextResponse.json(
         { success: false, error: "User already a HOST" },
@@ -77,19 +80,49 @@ export async function POST(req: Request) {
       )
     }
 
+    // ============================
+    // ✅ EARLY USERS SHOULD NOT PAY
+    // ============================
     if (user.login_order <= 100) {
       await client.query("ROLLBACK")
       return NextResponse.json(
-        { success: false, error: "Early users already free HOST" },
+        {
+          success: false,
+          error: "Early pioneers already receive free HOST access",
+        },
         { status: 400 }
       )
     }
 
     // ============================
-    // ✅ CHECK ALREADY UNLOCKED
+    // ✅ PREVENT PAYMENT REUSE
+    // ============================
+    const paymentUsed = await client.query(
+      `
+      SELECT id FROM host_unlocks
+      WHERE payment_id=$1
+      LIMIT 1
+      `,
+      [paymentId]
+    )
+
+    if (paymentUsed.rows.length > 0) {
+      await client.query("ROLLBACK")
+      return NextResponse.json(
+        { success: false, error: "Payment already used" },
+        { status: 400 }
+      )
+    }
+
+    // ============================
+    // ✅ PREVENT DOUBLE UNLOCK USER
     // ============================
     const unlockCheck = await client.query(
-      `SELECT * FROM host_unlocks WHERE user_id=$1 LIMIT 1`,
+      `
+      SELECT id FROM host_unlocks
+      WHERE user_id=$1
+      LIMIT 1
+      `,
       [userId]
     )
 
@@ -106,12 +139,13 @@ export async function POST(req: Request) {
     // ============================
     const rewardCoins = 50000
 
-    await client.query(
+    const updatedUser = await client.query(
       `
       UPDATE users
       SET role='HOST',
           coin_balance = coin_balance + $1
       WHERE id=$2
+      RETURNING id, username, role, coin_balance
       `,
       [rewardCoins, userId]
     )
@@ -133,6 +167,7 @@ export async function POST(req: Request) {
       success: true,
       message: "🎉 Host unlocked successfully!",
       reward: rewardCoins,
+      user: updatedUser.rows[0],
     })
   } catch (err: any) {
     await client.query("ROLLBACK")
