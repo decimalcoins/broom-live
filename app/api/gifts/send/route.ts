@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
+import crypto from "crypto"
 
 export async function POST(req: Request) {
-  const client = await db.connect()
-
   try {
     const { streamId, senderId, giftAmount } = await req.json()
 
@@ -21,17 +20,15 @@ export async function POST(req: Request) {
       )
     }
 
-    await client.query("BEGIN")
-
     // ============================
     // ✅ CHECK STREAM LIVE
     // ============================
-    const streamRes = await client.query(
+    const streamRes = await db.query(
       `
       SELECT id, host_id, is_live
       FROM streams
       WHERE id=$1
-      FOR UPDATE
+      LIMIT 1
       `,
       [streamId]
     )
@@ -39,7 +36,6 @@ export async function POST(req: Request) {
     const stream = streamRes.rows[0]
 
     if (!stream) {
-      await client.query("ROLLBACK")
       return NextResponse.json(
         { success: false, error: "Stream not found" },
         { status: 404 }
@@ -47,7 +43,6 @@ export async function POST(req: Request) {
     }
 
     if (!stream.is_live) {
-      await client.query("ROLLBACK")
       return NextResponse.json(
         { success: false, error: "Stream is not live" },
         { status: 400 }
@@ -57,14 +52,14 @@ export async function POST(req: Request) {
     const hostId = stream.host_id
 
     // ============================
-    // ✅ CHECK VIEWER COIN BALANCE
+    // ✅ CHECK VIEWER BALANCE
     // ============================
-    const senderRes = await client.query(
+    const senderRes = await db.query(
       `
       SELECT id, coin_balance
       FROM users
       WHERE id=$1
-      FOR UPDATE
+      LIMIT 1
       `,
       [senderId]
     )
@@ -72,7 +67,6 @@ export async function POST(req: Request) {
     const sender = senderRes.rows[0]
 
     if (!sender) {
-      await client.query("ROLLBACK")
       return NextResponse.json(
         { success: false, error: "Sender not found" },
         { status: 404 }
@@ -80,7 +74,6 @@ export async function POST(req: Request) {
     }
 
     if (sender.coin_balance < giftAmount) {
-      await client.query("ROLLBACK")
       return NextResponse.json(
         { success: false, error: "Not enough coins" },
         { status: 400 }
@@ -88,11 +81,12 @@ export async function POST(req: Request) {
     }
 
     // ============================
-    // ✅ TRANSFER COINS
+    // ✅ ATOMIC TRANSFER
     // ============================
+    await db.query("BEGIN")
 
-    // Viewer - giftAmount
-    await client.query(
+    // Deduct sender coins
+    await db.query(
       `
       UPDATE users
       SET coin_balance = coin_balance - $1
@@ -101,8 +95,8 @@ export async function POST(req: Request) {
       [giftAmount, senderId]
     )
 
-    // Host + giftAmount
-    await client.query(
+    // Add host coins
+    await db.query(
       `
       UPDATE users
       SET coin_balance = coin_balance + $1
@@ -112,46 +106,57 @@ export async function POST(req: Request) {
     )
 
     // ============================
-    // ✅ INSERT GIFT RECORD
+    // ✅ TRANSACTION LOG (Sender)
     // ============================
-    await client.query(
+    const txSenderId = crypto.randomUUID()
+
+    await db.query(
       `
-      INSERT INTO gifts (stream_id, sender_id, host_id, gift_amount)
-      VALUES ($1, $2, $3, $4)
+      INSERT INTO transactions (
+        id,
+        user_id,
+        type,
+        amount,
+        currency,
+        related_user_id,
+        stream_id,
+        created_at
+      )
+      VALUES ($1,$2,'gift_sent',$3,'coin',$4,$5,NOW())
       `,
-      [streamId, senderId, hostId, giftAmount]
+      [txSenderId, senderId, giftAmount, hostId, streamId]
     )
 
     // ============================
-    // ✅ TRANSACTION LOGS
+    // ✅ TRANSACTION LOG (Host)
     // ============================
+    const txHostId = crypto.randomUUID()
 
-    // Sender transaction
-    await client.query(
+    await db.query(
       `
-      INSERT INTO transactions (user_id, type, amount, currency)
-      VALUES ($1, 'gift_sent', $2, 'COIN')
+      INSERT INTO transactions (
+        id,
+        user_id,
+        type,
+        amount,
+        currency,
+        related_user_id,
+        stream_id,
+        created_at
+      )
+      VALUES ($1,$2,'gift_received',$3,'coin',$4,$5,NOW())
       `,
-      [senderId, giftAmount]
+      [txHostId, hostId, giftAmount, senderId, streamId]
     )
 
-    // Host transaction
-    await client.query(
-      `
-      INSERT INTO transactions (user_id, type, amount, currency)
-      VALUES ($1, 'gift_received', $2, 'COIN')
-      `,
-      [hostId, giftAmount]
-    )
-
-    await client.query("COMMIT")
+    await db.query("COMMIT")
 
     return NextResponse.json({
       success: true,
       message: "🎁 Gift sent successfully!",
     })
   } catch (err: any) {
-    await client.query("ROLLBACK")
+    await db.query("ROLLBACK")
 
     console.error("❌ GIFT SEND ERROR:", err)
 
@@ -159,7 +164,5 @@ export async function POST(req: Request) {
       { success: false, error: err.message || "Gift failed" },
       { status: 500 }
     )
-  } finally {
-    client.release()
   }
 }
