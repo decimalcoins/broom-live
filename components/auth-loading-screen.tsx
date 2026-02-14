@@ -15,7 +15,8 @@ export function AuthLoadingScreen({ message }: AuthLoadingScreenProps) {
 
   const isError =
     finalMessage.toLowerCase().includes("failed") ||
-    finalMessage.toLowerCase().includes("error")
+    finalMessage.toLowerCase().includes("error") ||
+    finalMessage.toLowerCase().includes("not detected")
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-white">
@@ -45,9 +46,7 @@ export function AuthLoadingScreen({ message }: AuthLoadingScreenProps) {
         {/* ✅ MESSAGE */}
         <div className="space-y-2">
           <h2 className="text-xl font-semibold">
-            {isError
-              ? "Authentication Failed"
-              : "Connecting to Pi Network..."}
+            {isError ? "Authentication Failed" : "Connecting to Pi Network..."}
           </h2>
 
           <p

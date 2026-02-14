@@ -3,8 +3,6 @@ import { db } from "@/lib/db"
 import { verifyPiToken } from "@/lib/pi"
 
 export async function POST(req: Request) {
-  const client = await db.connect()
-
   try {
     const { pi_auth_token } = await req.json()
 
@@ -33,7 +31,7 @@ export async function POST(req: Request) {
     // ============================
     // ✅ CHECK EXISTING USER
     // ============================
-    const existing = await client.query(
+    const existing = await db.query(
       `SELECT * FROM users WHERE uid=$1 LIMIT 1`,
       [uid]
     )
@@ -49,12 +47,9 @@ export async function POST(req: Request) {
     // ============================
     // ✅ NEW USER REGISTRATION
     // ============================
-    await client.query("BEGIN")
 
-    // ============================
     // ✅ ATOMIC LOGIN ORDER COUNTER
-    // ============================
-    const counterRes = await client.query(
+    const counterRes = await db.query(
       `
       UPDATE login_counter
       SET current_value = current_value + 1
@@ -69,7 +64,7 @@ export async function POST(req: Request) {
     // ✅ BONUS + ROLE RULES
     // ============================
     let bonusCoin = 0
-    let role = "viewer" // default viewer
+    let role = "viewer"
 
     if (loginOrder >= 1 && loginOrder <= 20) {
       bonusCoin = 5000
@@ -82,7 +77,7 @@ export async function POST(req: Request) {
     // ============================
     // ✅ INSERT USER INTO DATABASE
     // ============================
-    const result = await client.query(
+    const result = await db.query(
       `
       INSERT INTO users (
         uid,
@@ -97,8 +92,6 @@ export async function POST(req: Request) {
       [uid, username, bonusCoin, role, loginOrder]
     )
 
-    await client.query("COMMIT")
-
     return NextResponse.json({
       success: true,
       user: result.rows[0],
@@ -108,11 +101,9 @@ export async function POST(req: Request) {
       message:
         loginOrder <= 100
           ? "🎉 Congrats! You are now a HOST!"
-          : "Welcome! Viewer access only. Unlock host with 1 Pi.",
+          : "Welcome! Viewer access only.",
     })
   } catch (err: any) {
-    await client.query("ROLLBACK")
-
     console.error("❌ LOGIN ERROR:", err)
 
     return NextResponse.json(
@@ -122,7 +113,5 @@ export async function POST(req: Request) {
       },
       { status: 500 }
     )
-  } finally {
-    client.release()
   }
 }

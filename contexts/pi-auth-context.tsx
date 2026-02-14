@@ -37,6 +37,9 @@ interface PiAuthContextType {
   isAuthenticated: boolean
   authMessage: string
   userData: LoginDTO | null
+
+  /** ✅ retry button support */
+  reinitialize: () => void
 }
 
 const PiAuthContext = createContext<PiAuthContextType | undefined>(undefined)
@@ -46,52 +49,65 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
   const [authMessage, setAuthMessage] = useState("Loading Pi SDK...")
   const [userData, setUserData] = useState<LoginDTO | null>(null)
 
-  useEffect(() => {
-    async function init() {
-      try {
-        if (typeof window === "undefined") return
+  /** ✅ Main Pi Auth Init */
+  async function init() {
+    try {
+      if (typeof window === "undefined") return
 
-        // ✅ Wait until Pi Browser injects window.Pi
-        let tries = 0
-        while (!window.Pi && tries < 20) {
-          await new Promise((r) => setTimeout(r, 500))
-          tries++
-        }
+      setAuthMessage("Loading Pi SDK...")
 
-        if (!window.Pi) {
-          setAuthMessage("❌ Pi Browser not detected")
-          return
-        }
+      // ✅ Reset state before retry
+      setIsAuthenticated(false)
+      setUserData(null)
 
-        setAuthMessage("Initializing Pi Network...")
-
-        await window.Pi.init({
-          version: "2.0",
-          sandbox: false,
-        })
-
-        setAuthMessage("Authenticating with Pi...")
-
-        const auth: PiAuthResult = await window.Pi.authenticate(["username"])
-
-        setAuthMessage("Logging into backend...")
-
-        const loginRes = await api.post(BACKEND_URLS.LOGIN, {
-          pi_auth_token: auth.accessToken,
-        })
-
-        setApiAuthToken(auth.accessToken)
-
-        setUserData(loginRes.data.user)
-        setIsAuthenticated(true)
-
-        setAuthMessage("✅ Login Success")
-      } catch (err) {
-        console.error("Pi Auth Error:", err)
-        setAuthMessage("❌ Authentication failed")
+      // ✅ Wait until Pi Browser injects window.Pi
+      let tries = 0
+      while (!window.Pi && tries < 20) {
+        await new Promise((r) => setTimeout(r, 500))
+        tries++
       }
-    }
 
+      if (!window.Pi) {
+        setAuthMessage("❌ Pi Browser not detected")
+        return
+      }
+
+      setAuthMessage("Initializing Pi Network...")
+
+      // ✅ Init Pi SDK
+      await window.Pi.init({
+        version: "2.0",
+        sandbox: false,
+      })
+
+      setAuthMessage("Authenticating with Pi...")
+
+      // ✅ Pi Authenticate
+      const auth: PiAuthResult = await window.Pi.authenticate(["username"])
+
+      setAuthMessage("Logging into backend...")
+
+      // ✅ Backend Login
+      const loginRes = await api.post(BACKEND_URLS.LOGIN, {
+        pi_auth_token: auth.accessToken,
+      })
+
+      // ✅ Store token for API requests
+      setApiAuthToken(auth.accessToken)
+
+      // ✅ Save user
+      setUserData(loginRes.data.user)
+      setIsAuthenticated(true)
+
+      setAuthMessage("✅ Login Success")
+    } catch (err) {
+      console.error("Pi Auth Error:", err)
+      setAuthMessage("❌ Authentication failed")
+    }
+  }
+
+  /** ✅ Auto Init on Mount */
+  useEffect(() => {
     init()
   }, [])
 
@@ -101,6 +117,9 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated,
         authMessage,
         userData,
+
+        // ✅ retry support
+        reinitialize: init,
       }}
     >
       {children}
