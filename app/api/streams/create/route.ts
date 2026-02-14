@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
+import crypto from "crypto"
 
 export async function POST(req: Request) {
-  const client = await db.connect()
-
   try {
-    const { userId } = await req.json()
+    const { userId, title, description } = await req.json()
 
     if (!userId) {
       return NextResponse.json(
@@ -14,18 +13,15 @@ export async function POST(req: Request) {
       )
     }
 
-    await client.query("BEGIN")
-
     // ============================
     // ✅ CHECK USER ROLE HOST
     // ============================
-    const userRes = await client.query(
+    const userRes = await db.query(
       `
       SELECT id, username, role
       FROM users
       WHERE id=$1
       LIMIT 1
-      FOR UPDATE
       `,
       [userId]
     )
@@ -33,15 +29,14 @@ export async function POST(req: Request) {
     const user = userRes.rows[0]
 
     if (!user) {
-      await client.query("ROLLBACK")
       return NextResponse.json(
         { success: false, error: "User not found" },
         { status: 404 }
       )
     }
 
-    if (user.role !== "HOST") {
-      await client.query("ROLLBACK")
+    // ✅ Role stored as "host" lowercase
+    if (user.role !== "host") {
       return NextResponse.json(
         { success: false, error: "Only HOST can start live streams" },
         { status: 403 }
@@ -51,7 +46,7 @@ export async function POST(req: Request) {
     // ============================
     // ✅ CHECK HOST ALREADY LIVE
     // ============================
-    const existingLive = await client.query(
+    const existingLive = await db.query(
       `
       SELECT id
       FROM streams
@@ -62,7 +57,6 @@ export async function POST(req: Request) {
     )
 
     if (existingLive.rows.length > 0) {
-      await client.query("ROLLBACK")
       return NextResponse.json(
         { success: false, error: "You already have an active stream" },
         { status: 400 }
@@ -72,27 +66,37 @@ export async function POST(req: Request) {
     // ============================
     // ✅ CREATE STREAM RECORD
     // ============================
-    const streamRes = await client.query(
+    const streamId = crypto.randomUUID()
+
+    const streamTitle =
+      title || `Live Stream by ${user.username}`
+
+    const streamRes = await db.query(
       `
       INSERT INTO streams (
+        id,
         host_id,
         host_username,
+        title,
+        description,
         is_live,
         viewer_count,
         started_at,
-        created_at,
-        host_connected,
-        host_published
+        created_at
       )
-      VALUES ($1, $2, true, 0, NOW(), NOW(), true, false)
+      VALUES ($1,$2,$3,$4,$5,true,0,NOW(),NOW())
       RETURNING *
       `,
-      [user.id, user.username]
+      [
+        streamId,
+        user.id,
+        user.username,
+        streamTitle,
+        description || null,
+      ]
     )
 
     const stream = streamRes.rows[0]
-
-    await client.query("COMMIT")
 
     return NextResponse.json({
       success: true,
@@ -100,15 +104,11 @@ export async function POST(req: Request) {
       stream,
     })
   } catch (err: any) {
-    await client.query("ROLLBACK")
-
     console.error("❌ STREAM CREATE ERROR:", err)
 
     return NextResponse.json(
       { success: false, error: err.message || "Stream create failed" },
       { status: 500 }
     )
-  } finally {
-    client.release()
   }
 }
