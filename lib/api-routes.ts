@@ -11,6 +11,10 @@ export const API_ROUTES = {
   GET_USER: (id: string) => `/api/users/${id}`,
   GET_USER_COINS: (id: string) => `/api/users/${id}/coins`,
 
+  // ✅ Transactions history
+  GET_TRANSACTIONS: (id: string) =>
+    `/api/users/${id}/transactions`,
+
   // ============================
   // STREAMS
   // ============================
@@ -18,7 +22,6 @@ export const API_ROUTES = {
   GET_STREAM: (id: string) => `/api/streams/${id}`,
 
   CREATE_STREAM: `/api/streams/create`,
-
   START_STREAM: (id: string) => `/api/streams/${id}/start`,
   END_STREAM: (id: string) => `/api/streams/${id}/end`,
 
@@ -34,6 +37,12 @@ export const API_ROUTES = {
   // LIVEKIT TOKEN
   // ============================
   LIVEKIT_TOKEN: `/api/livekit/token`,
+
+  // ============================
+  // PAYMENTS (Pi)
+  // ============================
+  PAYMENT_APPROVE: `/api/payments/approve`,
+  PAYMENT_COMPLETE: `/api/payments/complete`,
 
   // ============================
   // WITHDRAWALS
