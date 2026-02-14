@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { verifyPiToken } from "@/lib/pi"
+import crypto from "crypto"
 
 export async function POST(req: Request) {
   try {
@@ -13,9 +14,7 @@ export async function POST(req: Request) {
       )
     }
 
-    // ============================
-    // ✅ VERIFY TOKEN TO PI SERVER
-    // ============================
+    // ✅ Verify Pi Token
     const piUser = await verifyPiToken(pi_auth_token)
 
     const username = piUser.username
@@ -28,9 +27,7 @@ export async function POST(req: Request) {
       )
     }
 
-    // ============================
-    // ✅ CHECK EXISTING USER
-    // ============================
+    // ✅ Existing user check
     const existing = await db.query(
       `SELECT * FROM users WHERE uid=$1 LIMIT 1`,
       [uid]
@@ -44,11 +41,7 @@ export async function POST(req: Request) {
       })
     }
 
-    // ============================
-    // ✅ NEW USER REGISTRATION
-    // ============================
-
-    // ✅ ATOMIC LOGIN ORDER COUNTER
+    // ✅ Login order counter
     const counterRes = await db.query(
       `
       UPDATE login_counter
@@ -60,9 +53,7 @@ export async function POST(req: Request) {
 
     const loginOrder = counterRes.rows[0].current_value
 
-    // ============================
-    // ✅ BONUS + ROLE RULES
-    // ============================
+    // ✅ Bonus + role rules
     let bonusCoin = 0
     let role = "viewer"
 
@@ -74,22 +65,24 @@ export async function POST(req: Request) {
       role = "host"
     }
 
-    // ============================
-    // ✅ INSERT USER INTO DATABASE
-    // ============================
+    // ✅ Generate ID manually
+    const id = crypto.randomUUID()
+
+    // ✅ Insert user WITH id
     const result = await db.query(
       `
       INSERT INTO users (
+        id,
         uid,
         username,
         coin_balance,
         role,
         login_order
       )
-      VALUES ($1, $2, $3, $4, $5)
+      VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *
       `,
-      [uid, username, bonusCoin, role, loginOrder]
+      [id, uid, username, bonusCoin, role, loginOrder]
     )
 
     return NextResponse.json({
@@ -98,10 +91,7 @@ export async function POST(req: Request) {
       loginOrder,
       bonusCoins: bonusCoin,
       role,
-      message:
-        loginOrder <= 100
-          ? "🎉 Congrats! You are now a HOST!"
-          : "Welcome! Viewer access only.",
+      message: "🎉 Account created successfully!",
     })
   } catch (err: any) {
     console.error("❌ LOGIN ERROR:", err)
