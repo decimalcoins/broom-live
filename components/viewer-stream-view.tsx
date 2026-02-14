@@ -26,16 +26,14 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
   const [tokenError, setTokenError] = useState<string | null>(null)
 
   // ============================
-  // ROOM NAME
+  // ✅ ROOM NAME MUST MATCH HOST
   // ============================
-  const roomName = stream.host_username
-    ? `broom_${stream.host_username}`
-    : null
+  const roomName = stream.host_id ? `broom_${stream.host_id}` : null
 
   const { room, connect, disconnect, isConnected } = useLiveKit(roomName, token)
 
   // ============================
-  // FETCH VIEWER TOKEN
+  // ✅ FETCH VIEWER TOKEN (PER STREAM)
   // ============================
   useEffect(() => {
     if (!roomName) return
@@ -43,16 +41,19 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
     const fetchToken = async () => {
       try {
         setLoadingToken(true)
+        setTokenError(null)
 
-        const res = await fetch("/api/livekit/token", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            roomName,
-            identity: `viewer-${Date.now()}`,
-            role: "viewer",
-          }),
-        })
+        const res = await fetch(
+          `/api/streams/${stream.id}/viewer-token`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              roomName,
+              identity: `viewer-${Date.now()}`,
+            }),
+          }
+        )
 
         const data = await res.json()
 
@@ -62,6 +63,7 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
 
         setToken(data.token)
       } catch (err: any) {
+        console.error("Viewer Token Error:", err)
         setTokenError(err.message)
       } finally {
         setLoadingToken(false)
@@ -69,16 +71,18 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
     }
 
     fetchToken()
-  }, [roomName])
+  }, [roomName, stream.id])
 
   // ============================
-  // CONNECT ROOM
+  // ✅ CONNECT ROOM
   // ============================
   useEffect(() => {
     if (!token) return
+
     connect()
+
     return () => disconnect()
-  }, [token])
+  }, [token, connect, disconnect])
 
   // ============================
   // ✅ LISTEN STREAM END EVENT
@@ -96,14 +100,24 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
           disconnect()
           router.push("/dashboard")
         }
+
+        // 🎁 Gift Event Forward to UI
+        if (msg.type === "gift") {
+          window.dispatchEvent(
+            new CustomEvent("livekit-gift", {
+              detail: msg,
+            })
+          )
+        }
       } catch (err) {
         console.error("Data parse error:", err)
       }
     }
 
     room.on("dataReceived", handleData)
+
     return () => room.off("dataReceived", handleData)
-  }, [room])
+  }, [room, disconnect, router])
 
   // ============================
   // UI STATES
@@ -152,9 +166,8 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
   // ============================
   // HOST VIDEO TRACK
   // ============================
-  const publication = hostParticipant.getTrackPublication(
-    Track.Source.Camera
-  )
+  const publication =
+    hostParticipant.getTrackPublication(Track.Source.Camera)
 
   const videoTrack = publication?.track
   const viewerCount = remoteParticipants.length
