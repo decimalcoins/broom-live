@@ -5,10 +5,17 @@ export async function GET() {
   try {
     const res = await db.query(
       `
-      SELECT id, host_id, host_username,
-             viewer_count, started_at
+      SELECT
+        id,
+        host_id,
+        host_username,
+        title,
+        description,
+        thumbnail_url,
+        viewer_count,
+        started_at
       FROM streams
-      WHERE is_live=true
+      WHERE is_live = true
       ORDER BY started_at DESC
       `
     )
