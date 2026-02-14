@@ -18,12 +18,12 @@ import { Gift, Coins } from "lucide-react"
 import type { Gift as GiftType } from "@/lib/types"
 import { useCoins } from "@/contexts/coin-context"
 import { usePiAuth } from "@/contexts/pi-auth-context"
-import { useLiveKit } from "@/hooks/use-livekit"
+import { useLiveKitRoom } from "@/contexts/livekit-context"
 
 interface GiftPickerProps {
   streamId: string
   hostId: string
-  onGiftSent: () => void
+  onGiftSent: (giftCost: number) => void
 }
 
 export function GiftPicker({ streamId, hostId, onGiftSent }: GiftPickerProps) {
@@ -34,9 +34,8 @@ export function GiftPicker({ streamId, hostId, onGiftSent }: GiftPickerProps) {
   const { balance, setBalance } = useCoins()
   const { userData } = usePiAuth()
 
-  // ✅ LiveKit Hook (viewer side)
-  const roomName = `broom_${hostId}`
-  const { sendData } = useLiveKit(roomName, null)
+  // ✅ Use existing LiveKit Room from Provider
+  const { room } = useLiveKitRoom()
 
   // ============================
   // Load Gifts (Static List)
@@ -52,11 +51,16 @@ export function GiftPicker({ streamId, hostId, onGiftSent }: GiftPickerProps) {
   }, [open])
 
   // ======================================================
-  // ✅ Send Gift (Backend + Realtime)
+  // ✅ Send Gift (Backend + LiveKit Realtime)
   // ======================================================
   const handleSendGift = async (gift: GiftType) => {
     if (!userData) {
       alert("Login required")
+      return
+    }
+
+    if (!room) {
+      alert("Live room not connected")
       return
     }
 
@@ -74,9 +78,11 @@ export function GiftPicker({ streamId, hostId, onGiftSent }: GiftPickerProps) {
       // ============================
       const res = await fetch("/api/gifts/send", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          streamId: Number(streamId),
+          streamId, // UUID string
           senderId: userData.id,
+          giftId: gift.id,
           giftAmount: gift.coin_cost,
         }),
       })
@@ -85,7 +91,6 @@ export function GiftPicker({ streamId, hostId, onGiftSent }: GiftPickerProps) {
 
       if (!data.success) {
         alert("❌ Gift failed: " + data.error)
-        setSending(false)
         return
       }
 
@@ -95,20 +100,25 @@ export function GiftPicker({ streamId, hostId, onGiftSent }: GiftPickerProps) {
       setBalance(balance - gift.coin_cost)
 
       // ============================
-      // 3. Trigger Realtime Animation
+      // 3. Send Gift Realtime to Host
       // ============================
-      sendData({
-        type: "gift",
-        data: {
-          id: `gift-${Date.now()}`,
-          sender_username: userData.username,
-          gift,
-        },
-      })
+      room.localParticipant.publishData(
+        new TextEncoder().encode(
+          JSON.stringify({
+            type: "gift",
+            data: {
+              id: `gift-${Date.now()}`,
+              sender_username: userData.username,
+              gift,
+            },
+          })
+        ),
+        { reliable: true }
+      )
 
       console.log("🎁 Gift Sent Successfully:", gift.name)
 
-      onGiftSent()
+      onGiftSent(gift.coin_cost)
       setOpen(false)
     } catch (err) {
       console.error("❌ Gift Send Error:", err)
@@ -146,9 +156,7 @@ export function GiftPicker({ streamId, hostId, onGiftSent }: GiftPickerProps) {
                 {gift.image_url}
               </div>
 
-              <p className="text-sm font-medium text-center">
-                {gift.name}
-              </p>
+              <p className="text-sm font-medium text-center">{gift.name}</p>
 
               <div className="flex items-center justify-center gap-1 text-xs">
                 <Coins className="w-3 h-3" />
