@@ -1,16 +1,24 @@
 "use client"
 
 import { useEffect, useRef } from "react"
-import type { VideoTrack } from "livekit-client"
+import type {
+  LocalVideoTrack,
+  RemoteTrackPublication,
+  RemoteParticipant,
+} from "livekit-client"
 
 interface VideoPlayerProps {
-  track: VideoTrack | null
+  // ✅ Universal Track Type
+  track: LocalVideoTrack | RemoteTrackPublication | null
+
+  participant?: RemoteParticipant
   isLocal?: boolean
   className?: string
 }
 
 export function VideoPlayer({
   track,
+  participant,
   isLocal = false,
   className = "",
 }: VideoPlayerProps) {
@@ -19,10 +27,27 @@ export function VideoPlayer({
   useEffect(() => {
     if (!videoRef.current || !track) return
 
-    track.attach(videoRef.current)
+    // ===============================
+    // ✅ LOCAL TRACK CASE
+    // ===============================
+    if ("attach" in track) {
+      track.attach(videoRef.current)
+
+      return () => {
+        track.detach()
+      }
+    }
+
+    // ===============================
+    // ✅ REMOTE PUBLICATION CASE
+    // ===============================
+    const videoTrack = track.videoTrack
+    if (!videoTrack) return
+
+    videoTrack.attach(videoRef.current)
 
     return () => {
-      track.detach()
+      videoTrack.detach()
     }
   }, [track])
 

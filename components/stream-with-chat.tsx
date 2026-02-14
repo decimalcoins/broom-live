@@ -19,7 +19,9 @@ export function StreamWithChat({ stream }: StreamWithChatProps) {
   const { userData } = usePiAuth()
 
   const [activeGifts, setActiveGifts] = useState<GiftEvent[]>([])
-  const [coinBalance, setCoinBalance] = useState(userData?.coin_balance || 0)
+  const [coinBalance, setCoinBalance] = useState(
+    userData?.coin_balance || 0
+  )
 
   // ======================================================
   // ✅ Gift Received Handler (Animation)
@@ -35,13 +37,14 @@ export function StreamWithChat({ stream }: StreamWithChatProps) {
 
   // ======================================================
   // ✅ LIVEKIT REALTIME GIFT LISTENER
+  // (ViewerStreamView dispatches msg.data directly now)
   // ======================================================
   useEffect(() => {
     const onGiftEvent = (event: any) => {
-      const msg = event.detail
-      if (!msg || msg.type !== "gift") return
+      const giftData = event.detail
+      if (!giftData) return
 
-      handleGiftReceived(msg.data)
+      handleGiftReceived(giftData)
     }
 
     window.addEventListener("livekit-gift", onGiftEvent)
@@ -52,14 +55,10 @@ export function StreamWithChat({ stream }: StreamWithChatProps) {
   }, [])
 
   // ======================================================
-  // ✅ Gift Sent Handler (REAL)
+  // ✅ Gift Sent Handler (Balance Update)
   // ======================================================
-  const handleGiftSent = async (giftCost?: number) => {
-    if (!giftCost) return
-
-    // Update local balance instantly
+  const handleGiftSent = (giftCost: number) => {
     setCoinBalance((prev) => Math.max(prev - giftCost, 0))
-
     console.log("🎁 Gift sent successfully!")
   }
 
@@ -88,8 +87,8 @@ export function StreamWithChat({ stream }: StreamWithChatProps) {
         />
       </div>
 
-      {/* Chat Panel */}
-      <ChatPanel streamId={stream.id} />
+      {/* 💬 Chat Panel */}
+      <ChatPanel username={userData?.username || "Viewer"} />
     </ViewerStreamView>
   )
 }

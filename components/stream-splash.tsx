@@ -6,7 +6,7 @@ export function StreamSplash({
   children,
   label = "Preparing Stream...",
 }: {
-  children: React.ReactNode
+  children?: React.ReactNode
   label?: string
 }) {
   const [loading, setLoading] = useState(true)
@@ -40,12 +40,13 @@ export function StreamSplash({
 
           {/* ✅ Loader Bar */}
           <div className="w-48 h-1 bg-white/20 rounded-full mx-auto overflow-hidden">
-            <div className="h-full w-2/3 bg-white animate-pulse rounded-full"></div>
+            <div className="h-full w-2/3 bg-white animate-pulse rounded-full" />
           </div>
         </div>
       </div>
     )
   }
 
-  return <>{children}</>
+  // ✅ children safe fallback
+  return <>{children || null}</>
 }

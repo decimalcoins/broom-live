@@ -1,56 +1,113 @@
 import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
+import { verifyPiToken } from "@/lib/pi/verify-token"
 
-export async function POST(req: Request) {
+export async function GET(req: Request) {
+  const client = await db.connect()
+
   try {
-    const { uid } = await req.json()
+    // ============================
+    // ✅ ACCESS TOKEN REQUIRED
+    // ============================
+    const accessToken =
+      req.headers.get("Authorization")?.replace("Bearer ", "") || null
 
-    if (!uid) {
+    if (!accessToken) {
       return NextResponse.json(
-        { success: false, error: "uid required" },
-        { status: 400 }
+        { success: false, error: "Missing Pi Access Token" },
+        { status: 401 }
       )
     }
 
-    // Cari user berdasarkan uid Pi
-    const res = await db.query(
+    // ============================
+    // ✅ VERIFY TOKEN TO PI SERVER
+    // ============================
+    const piUser = await verifyPiToken(accessToken)
+
+    if (!piUser?.uid) {
+      return NextResponse.json(
+        { success: false, error: "Invalid Pi Token" },
+        { status: 401 }
+      )
+    }
+
+    const uid = piUser.uid
+    const username = piUser.username
+
+    // ============================
+    // ✅ CHECK USER EXISTS
+    // ============================
+    const userRes = await client.query(
       `
-      SELECT id, uid, username, role, login_order,
-             coin_balance, pi_balance
+      SELECT *
       FROM users
-      WHERE uid=$1
+      WHERE id=$1
       LIMIT 1
       `,
       [uid]
     )
 
-    let user = res.rows[0]
-
-    // Kalau user belum ada → create otomatis
-    if (!user) {
-      const createRes = await db.query(
-        `
-        INSERT INTO users (uid, username, role, coin_balance, pi_balance, login_order)
-        VALUES ($1, $2, 'USER', 0, 0, 0)
-        RETURNING *
-        `,
-        [uid, "Pioneer"]
-      )
-
-      user = createRes.rows[0]
+    // ============================
+    // ✅ USER EXISTS → RETURN
+    // ============================
+    if (userRes.rows.length > 0) {
+      return NextResponse.json({
+        success: true,
+        user: userRes.rows[0],
+      })
     }
+
+    // ============================
+    // ✅ NEW USER → CREATE
+    // ============================
+
+    // login_order auto increment
+    const orderRes = await client.query(
+      `SELECT COUNT(*)::int AS total FROM users`
+    )
+
+    const loginOrder = orderRes.rows[0].total + 1
+
+    const newUserRes = await client.query(
+      `
+      INSERT INTO users (
+        id,
+        username,
+        role,
+        coin_balance,
+        pi_balance,
+        login_order,
+        created_at,
+        updated_at
+      )
+      VALUES (
+        $1,
+        $2,
+        'viewer',
+        0,
+        0,
+        $3,
+        NOW(),
+        NOW()
+      )
+      RETURNING *
+      `,
+      [uid, username, loginOrder]
+    )
 
     return NextResponse.json({
       success: true,
-      user,
-      can_host: user.role === "HOST",
+      message: "New Pi user created",
+      user: newUserRes.rows[0],
     })
-  } catch (err) {
-    console.error("❌ /me error:", err)
+  } catch (err: any) {
+    console.error("❌ /api/user/me ERROR:", err)
 
     return NextResponse.json(
-      { success: false, error: "Failed to load user" },
+      { success: false, error: err.message || "User fetch failed" },
       { status: 500 }
     )
+  } finally {
+    client.release()
   }
 }

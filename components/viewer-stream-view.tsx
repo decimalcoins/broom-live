@@ -1,6 +1,5 @@
 "use client"
 
-import type React from "react"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 
@@ -27,6 +26,8 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
 
   // ============================
   // ✅ ROOM NAME MUST MATCH HOST
+  // Host uses: broom_${user.uid}
+  // Viewer must use: broom_${stream.host_id}
   // ============================
   const roomName = stream.host_id ? `broom_${stream.host_id}` : null
 
@@ -78,8 +79,11 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
     if (!token) return
 
     connect()
-    return () => disconnect()
-  }, [token, connect, disconnect])
+
+    return () => {
+      disconnect()
+    }
+  }, [token])
 
   // ============================
   // ✅ LISTEN STREAM END + GIFTS
@@ -99,11 +103,11 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
           router.push("/dashboard")
         }
 
-        // 🎁 Gift Event Forward to UI
+        // 🎁 Gift Event → forward to StreamWithChat UI
         if (msg.type === "gift") {
           window.dispatchEvent(
             new CustomEvent("livekit-gift", {
-              detail: msg,
+              detail: msg.data,
             })
           )
         }
@@ -117,7 +121,7 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
     return () => {
       room.off("dataReceived", handleData)
     }
-  }, [room, disconnect, router])
+  }, [room])
 
   // ============================
   // UI STATES
@@ -164,7 +168,7 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
   }
 
   // ============================
-  // HOST VIDEO TRACK PUBLICATION
+  // HOST VIDEO PUBLICATION
   // ============================
   const publication = hostParticipant.getTrackPublication(
     Track.Source.Camera
@@ -178,12 +182,8 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
   return (
     <div className="flex flex-col h-screen bg-black relative">
       {/* VIDEO */}
-      {publication ? (
-        <VideoPlayer
-          track={publication}
-          participant={hostParticipant}
-          className="w-full h-full"
-        />
+      {publication?.videoTrack ? (
+        <VideoPlayer track={publication} participant={hostParticipant} />
       ) : (
         <div className="flex items-center justify-center h-full text-white">
           <p>{isConnected ? "Waiting for host video..." : "Connecting..."}</p>

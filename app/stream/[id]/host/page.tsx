@@ -14,8 +14,8 @@ export default function HostStreamPage({
   const { id } = use(params)
   const router = useRouter()
 
-  // ✅ Convert streamId ke number
-  const streamId = Number(id)
+  // ✅ Stream ID harus string UUID
+  const streamId = id
 
   // ✅ Jika stream selesai → balik dashboard host
   const handleEndStream = () => {
@@ -23,7 +23,7 @@ export default function HostStreamPage({
   }
 
   return (
-    <StreamSplash>
+    <StreamSplash label="Starting Host Stream...">
       <HostStreamView streamId={streamId} onEndStream={handleEndStream} />
     </StreamSplash>
   )

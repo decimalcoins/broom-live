@@ -1,28 +1,32 @@
 "use client"
 
 import { useEffect, useState } from "react"
+
 import { usePiAuth } from "@/contexts/pi-auth-context"
 import { useCoins } from "@/contexts/coin-context"
+import { LiveKitProvider } from "@/contexts/livekit-context"
 
 import { useLiveKit } from "@/hooks/use-livekit"
 import { VideoPlayer } from "./video-player"
 
-import { Button } from "./ui/button"
-import { Video, VideoOff, Mic, MicOff, StopCircle } from "lucide-react"
-import { Card } from "./ui/card"
-
-import { Track } from "livekit-client"
-
-import { LiveKitProvider } from "@/contexts/livekit-context"
 import { ChatPanel } from "./chat-panel"
 import { GiftAnimation } from "./gift-animation"
+
+import { Button } from "./ui/button"
+import { Card } from "./ui/card"
+
+import { Video, VideoOff, Mic, MicOff, StopCircle } from "lucide-react"
+import { Track } from "livekit-client"
 
 interface HostStreamViewProps {
   streamId: string
   onEndStream: () => void
 }
 
-export function HostStreamView({ streamId, onEndStream }: HostStreamViewProps) {
+export function HostStreamView({
+  streamId,
+  onEndStream,
+}: HostStreamViewProps) {
   const { userData } = usePiAuth()
   const { addCoins } = useCoins()
 
@@ -33,7 +37,8 @@ export function HostStreamView({ streamId, onEndStream }: HostStreamViewProps) {
   const [tokenError, setTokenError] = useState<string | null>(null)
 
   // ===============================
-  // ✅ ROOM NAME SAFE (UID)
+  // ✅ ROOM NAME FIXED (UID)
+  // Host + Viewer MUST MATCH THIS
   // ===============================
   const roomName = userData?.uid ? `broom_${userData.uid}` : null
 
@@ -80,7 +85,7 @@ export function HostStreamView({ streamId, onEndStream }: HostStreamViewProps) {
 
         setToken(data.token)
       } catch (err: any) {
-        console.error("Token Error:", err)
+        console.error("Host Token Error:", err)
         setTokenError(err.message)
       } finally {
         setLoadingToken(false)
@@ -91,17 +96,20 @@ export function HostStreamView({ streamId, onEndStream }: HostStreamViewProps) {
   }, [roomName, userData?.username])
 
   // ===============================
-  // ✅ CONNECT ROOM
+  // ✅ CONNECT ROOM WHEN TOKEN READY
   // ===============================
   useEffect(() => {
     if (!token) return
 
     connect()
-    return () => disconnect()
-  }, [token, connect, disconnect])
+
+    return () => {
+      disconnect()
+    }
+  }, [token])
 
   // ===============================
-  // ✅ AUTO ENABLE CAMERA + MIC
+  // ✅ AUTO ENABLE CAM + MIC ONCE
   // ===============================
   useEffect(() => {
     if (!room || !isConnected) return
@@ -134,14 +142,17 @@ export function HostStreamView({ streamId, onEndStream }: HostStreamViewProps) {
     }
 
     room.on("dataReceived", handleData)
-    return () => room.off("dataReceived", handleData)
-  }, [room, addCoins])
+
+    return () => {
+      room.off("dataReceived", handleData)
+    }
+  }, [room])
 
   // ===============================
   // ✅ END STREAM
   // ===============================
   const handleEndStream = async () => {
-    if (!userData || !room) return
+    if (!room || !userData) return
 
     try {
       // Broadcast END event
@@ -149,13 +160,12 @@ export function HostStreamView({ streamId, onEndStream }: HostStreamViewProps) {
         new TextEncoder().encode(
           JSON.stringify({
             type: "stream_end",
-            message: "Stream has ended",
           })
         ),
         { reliable: true }
       )
 
-      // Update DB stream status
+      // Update DB
       await fetch("/api/streams/end", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -200,12 +210,12 @@ export function HostStreamView({ streamId, onEndStream }: HostStreamViewProps) {
   }
 
   // ===============================
-  // LOCAL VIDEO TRACK
+  // ✅ LOCAL VIDEO TRACK SAFE
   // ===============================
   const publication =
     room.localParticipant.getTrackPublication(Track.Source.Camera)
 
-  const localVideoTrack = publication?.track
+  const localVideoTrack = publication?.videoTrack ?? null
 
   // ===============================
   // MAIN HOST UI
@@ -231,15 +241,15 @@ export function HostStreamView({ streamId, onEndStream }: HostStreamViewProps) {
           </Card>
         </div>
 
-        {/* 🎁 GIFT */}
+        {/* 🎁 Gift */}
         {giftEvent && (
           <GiftAnimation
-            gift={giftEvent.gift}
+            gift={giftEvent}
             onComplete={() => setGiftEvent(null)}
           />
         )}
 
-        {/* 💬 CHAT */}
+        {/* 💬 Chat */}
         <ChatPanel username={userData?.username || "Host"} />
 
         {/* CONTROLS */}
