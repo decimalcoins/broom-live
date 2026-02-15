@@ -1,171 +1,267 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-
 import { usePiAuth } from "@/contexts/pi-auth-context"
-import { useCoins } from "@/contexts/coin-context"
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 
-import { Video, Users } from "lucide-react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+
+import { Coins, TrendingUp } from "lucide-react"
 
 import { api } from "@/lib/api"
 import { API_ROUTES } from "@/lib/api-routes"
 
-import type { Stream } from "@/lib/types"
+import type { Transaction, Withdrawal } from "@/lib/types"
+import { coinsToPi } from "@/lib/constants"
 
-import { CoinBalance } from "@/components/coin-balance"
-import { BuyCoinsDialog } from "@/components/buy-coins-dialog"
+import { useRouter } from "next/navigation"
 
-export default function HomePage() {
+import { CreateStreamDialog } from "@/components/create-stream-dialog"
+import { WithdrawalRequestDialog } from "@/components/withdrawal-request-dialog"
+
+export default function HostDashboardPage() {
+  const { userData, authMessage, isAuthenticated } = usePiAuth()
   const router = useRouter()
-  const { userData } = usePiAuth()
-  const { balance } = useCoins()
 
-  const [liveStreams, setLiveStreams] = useState<Stream[]>([])
+  const [coinBalance, setCoinBalance] = useState(0)
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([])
   const [loading, setLoading] = useState(true)
 
   // ============================
-  // Load Live Streams
+  // ✅ FETCH HOST DASHBOARD DATA
   // ============================
-  useEffect(() => {
-    fetchLiveStreams()
-  }, [])
-
-  const fetchLiveStreams = async () => {
-    setLoading(true)
+  const fetchDashboardData = async () => {
+    if (!userData) return
 
     try {
-      // ✅ FIX: Use LIVE_STREAMS endpoint
-      const res = await api.get(API_ROUTES.LIVE_STREAMS)
+      setLoading(true)
 
-      if (res.data.success) {
-        setLiveStreams(res.data.streams)
-      } else {
-        setLiveStreams([])
+      const [coinsRes, transactionsRes, withdrawalsRes] = await Promise.all([
+        api.get<{ success: boolean; balance: number }>(
+          API_ROUTES.GET_USER_COINS(userData.id)
+        ),
+
+        api.get<{ success: boolean; transactions: Transaction[] }>(
+          API_ROUTES.GET_TRANSACTIONS(userData.id)
+        ),
+
+        api.get<{ success: boolean; withdrawals: Withdrawal[] }>(
+          API_ROUTES.GET_WITHDRAWALS(userData.id)
+        ),
+      ])
+
+      // ✅ FIX RESPONSE FORMAT
+      if (coinsRes.data.success) {
+        setCoinBalance(coinsRes.data.balance)
+      }
+
+      if (transactionsRes.data.success) {
+        setTransactions(transactionsRes.data.transactions)
+      }
+
+      if (withdrawalsRes.data.success) {
+        setWithdrawals(withdrawalsRes.data.withdrawals)
       }
     } catch (err) {
-      console.error("❌ Failed to fetch live streams:", err)
-      setLiveStreams([])
+      console.error("❌ Failed to fetch dashboard data:", err)
     } finally {
       setLoading(false)
     }
   }
 
+  // ============================
+  // ✅ HOST ROLE GUARD
+  // ============================
+  useEffect(() => {
+    if (!isAuthenticated) return
+    if (!userData) return
+
+    if (userData.role !== "HOST") {
+      router.push("/dashboard")
+      return
+    }
+
+    fetchDashboardData()
+  }, [userData, isAuthenticated])
+
+  // ============================
+  // Loading Auth
+  // ============================
+  if (!isAuthenticated) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <p>{authMessage}</p>
+      </div>
+    )
+  }
+
+  // ============================
+  // Loading Dashboard
+  // ============================
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <p>Loading host dashboard...</p>
+      </div>
+    )
+  }
+
+  // ============================
+  // Stats
+  // ============================
+  const totalEarnings = transactions
+    .filter((t) => t.type === "gift_received")
+    .reduce((sum, t) => sum + t.amount, 0)
+
+  const pendingWithdrawals = withdrawals.filter((w) => w.status === "pending")
+
   return (
-    <div className="min-h-screen bg-background">
-      {/* HEADER */}
-      <header className="border-b bg-card">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          {/* Logo */}
-          <div className="flex items-center gap-2">
-            <Video className="w-8 h-8 text-primary" />
-            <h1 className="text-2xl font-bold">BROOM LIVE</h1>
-          </div>
-
-          {/* Right */}
-          <div className="flex items-center gap-3">
-            {/* Coin Balance */}
-            <CoinBalance balance={balance} />
-
-            {/* Host Dashboard */}
-            {userData?.role === "HOST" && (
-              <Button
-                onClick={() => router.push("/dashboard/host")}
-                variant="outline"
-              >
-                Dashboard
-              </Button>
-            )}
-          </div>
-        </div>
-      </header>
-
-      {/* MAIN */}
-      <main className="container mx-auto px-4 py-8">
-        {/* Top Section */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-3xl font-bold mb-2">Live Now</h2>
-            <p className="text-muted-foreground">
-              Watch and interact with live streams
-            </p>
-          </div>
-
-          <BuyCoinsDialog onSuccess={() => fetchLiveStreams()} />
+    <div className="min-h-screen bg-background pb-20">
+      <div className="container mx-auto px-4 py-6 max-w-4xl">
+        {/* Header */}
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold">Host Dashboard</h1>
+          <p className="text-muted-foreground">
+            Manage your streams and earnings
+          </p>
         </div>
 
-        {/* CONTENT */}
-        {loading ? (
-          <div className="text-center py-12">
-            <p>Loading streams...</p>
-          </div>
-        ) : liveStreams.length === 0 ? (
+        {/* Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          {/* Balance */}
           <Card>
-            <CardContent className="py-12 text-center">
-              <Video className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
-              <h3 className="text-xl font-semibold mb-2">
-                No Live Streams
-              </h3>
-              <p className="text-muted-foreground mb-4">
-                Check back later or start your own stream!
+            <CardHeader className="pb-3">
+              <CardDescription>Coin Balance</CardDescription>
+              <CardTitle className="text-3xl flex items-center gap-2">
+                <Coins className="w-6 h-6 text-yellow-500" />
+                {coinBalance.toLocaleString()}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                ≈ {coinsToPi(coinBalance).toFixed(4)} Pi
               </p>
-
-              {userData?.role === "HOST" && (
-                <Button onClick={() => router.push("/dashboard/host")}>
-                  Go Live Now
-                </Button>
-              )}
             </CardContent>
           </Card>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {liveStreams.map((stream) => (
-              <Card
-                key={stream.id}
-                className="cursor-pointer hover:shadow-lg transition-shadow"
-                onClick={() => router.push(`/stream/${stream.id}`)}
-              >
-                <CardHeader className="relative p-0">
-                  {/* Thumbnail */}
-                  <div className="aspect-video bg-muted flex items-center justify-center rounded-t-lg">
-                    <Video className="w-16 h-16 text-muted-foreground" />
-                  </div>
 
-                  {/* LIVE Badge */}
-                  <div className="absolute top-2 left-2 px-2 py-1 bg-red-500 text-white text-xs font-bold rounded">
-                    LIVE
-                  </div>
+          {/* Earnings */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardDescription>Total Earnings</CardDescription>
+              <CardTitle className="text-3xl flex items-center gap-2">
+                <TrendingUp className="w-6 h-6 text-green-500" />
+                {totalEarnings.toLocaleString()}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Coins earned from gifts
+              </p>
+            </CardContent>
+          </Card>
 
-                  {/* Viewer Count */}
-                  <div className="absolute top-2 right-2 px-2 py-1 bg-black/60 text-white text-xs rounded flex items-center gap-1">
-                    <Users className="w-3 h-3" />
-                    {stream.viewer_count}
-                  </div>
-                </CardHeader>
+          {/* Pending */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardDescription>Pending Withdrawals</CardDescription>
+              <CardTitle className="text-3xl">
+                {pendingWithdrawals.length}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Awaiting approval
+              </p>
+            </CardContent>
+          </Card>
+        </div>
 
-                <CardContent className="p-4">
-                  <CardTitle className="text-lg mb-1">
-                    {stream.title}
-                  </CardTitle>
+        {/* Actions */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <CreateStreamDialog
+            onStreamCreated={(streamId) =>
+              router.push(`/stream/${streamId}`) // ✅ FIX REDIRECT
+            }
+          />
 
-                  <CardDescription className="text-sm">
-                    @{stream.host_username}
-                  </CardDescription>
+          <WithdrawalRequestDialog
+            coinBalance={coinBalance}
+            onSuccess={fetchDashboardData}
+          />
+        </div>
 
-                  {stream.description && (
-                    <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
-                      {stream.description}
-                    </p>
-                  )}
+        {/* Tabs */}
+        <Tabs defaultValue="transactions">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="transactions">Transactions</TabsTrigger>
+            <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
+          </TabsList>
+
+          {/* Transactions */}
+          <TabsContent value="transactions" className="mt-4 space-y-3">
+            {transactions.length === 0 ? (
+              <Card>
+                <CardContent className="py-8 text-center text-muted-foreground">
+                  No transactions yet
                 </CardContent>
               </Card>
-            ))}
-          </div>
-        )}
-      </main>
+            ) : (
+              transactions.map((t) => (
+                <Card key={t.id}>
+                  <CardContent className="py-4 flex justify-between">
+                    <div>
+                      <p className="font-medium capitalize">
+                        {t.type.replace(/_/g, " ")}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {new Date(t.created_at).toLocaleString()}
+                      </p>
+                    </div>
+                    <p className="font-bold">
+                      +{t.amount.toLocaleString()} {t.currency}
+                    </p>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </TabsContent>
+
+          {/* Withdrawals */}
+          <TabsContent value="withdrawals" className="mt-4 space-y-3">
+            {withdrawals.length === 0 ? (
+              <Card>
+                <CardContent className="py-8 text-center text-muted-foreground">
+                  No withdrawal requests yet
+                </CardContent>
+              </Card>
+            ) : (
+              withdrawals.map((w) => (
+                <Card key={w.id}>
+                  <CardContent className="py-4 flex justify-between">
+                    <div>
+                      <p className="font-medium">
+                        {w.coin_amount.toLocaleString()} Coins
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {new Date(w.requested_at).toLocaleString()}
+                      </p>
+                    </div>
+                    <span className="font-bold">{w.status}</span>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   )
 }
