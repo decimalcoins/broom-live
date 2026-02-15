@@ -15,7 +15,6 @@ import { Button } from "./ui/button"
 import { Input } from "./ui/input"
 import { Textarea } from "./ui/textarea"
 import { Label } from "./ui/label"
-
 import { Video } from "lucide-react"
 
 import { api } from "@/lib/api"
@@ -25,9 +24,7 @@ interface CreateStreamDialogProps {
   onStreamCreated: (streamId: string) => void
 }
 
-export function CreateStreamDialog({
-  onStreamCreated,
-}: CreateStreamDialogProps) {
+export function CreateStreamDialog({ onStreamCreated }: CreateStreamDialogProps) {
   const { userData } = usePiAuth()
 
   const [open, setOpen] = useState(false)
@@ -35,26 +32,13 @@ export function CreateStreamDialog({
   const [description, setDescription] = useState("")
   const [creating, setCreating] = useState(false)
 
-  // ============================
-  // ✅ CREATE STREAM
-  // ============================
   const handleCreate = async () => {
-    if (!userData) {
-      alert("User not logged in")
-      return
-    }
-
-    if (!title.trim()) {
-      alert("Title is required")
-      return
-    }
+    if (!userData) return alert("User not logged in")
+    if (!title.trim()) return alert("Title required")
 
     setCreating(true)
 
     try {
-      // ============================
-      // ✅ FIX: Correct Payload
-      // ============================
       const res = await api.post(API_ROUTES.CREATE_STREAM, {
         userId: userData.id,
         title: title.trim(),
@@ -62,30 +46,26 @@ export function CreateStreamDialog({
       })
 
       if (!res.data.success) {
-        alert(res.data.error || "Failed to create stream")
-        return
+        return alert(res.data.error || "Failed to create stream")
       }
 
-      // ✅ Stream created successfully
+      // ✅ FIX: ambil stream.id
       const streamId = res.data.stream.id
 
+      // ✅ redirect / open stream
       onStreamCreated(streamId)
 
-      // Reset UI
       setOpen(false)
       setTitle("")
       setDescription("")
     } catch (err) {
-      console.error("❌ Failed to create stream:", err)
+      console.error("❌ Failed create stream:", err)
       alert("Failed to create stream")
     } finally {
       setCreating(false)
     }
   }
 
-  // ============================
-  // UI
-  // ============================
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -105,7 +85,6 @@ export function CreateStreamDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {/* Title */}
           <div>
             <Label>Stream Title</Label>
             <Input
@@ -115,7 +94,6 @@ export function CreateStreamDialog({
             />
           </div>
 
-          {/* Description */}
           <div>
             <Label>Description</Label>
             <Textarea
@@ -125,12 +103,7 @@ export function CreateStreamDialog({
             />
           </div>
 
-          {/* Button */}
-          <Button
-            className="w-full"
-            disabled={creating}
-            onClick={handleCreate}
-          >
+          <Button className="w-full" disabled={creating} onClick={handleCreate}>
             {creating ? "Creating..." : "Start Stream"}
           </Button>
         </div>

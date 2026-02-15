@@ -14,32 +14,26 @@ import { API_ROUTES } from "@/lib/api-routes"
 
 interface CoinContextType {
   balance: number
-  setBalance: (val: number) => void
+  refreshBalance: () => void
   addCoins: (amount: number) => void
-  refreshBalance: () => Promise<void>
 }
 
 const CoinContext = createContext<CoinContextType | undefined>(undefined)
 
 export function CoinProvider({ children }: { children: ReactNode }) {
   const { userData } = usePiAuth()
-
   const [balance, setBalance] = useState(0)
 
-  // ==========================================
-  // ✅ Fetch Balance from Backend (REAL SOURCE)
-  // ==========================================
+  // ✅ FETCH REAL BALANCE FROM DB
   const refreshBalance = async () => {
     if (!userData?.id) return
 
     try {
-      const res = await api.get<{
-        success: boolean
-        balance: number
-      }>(API_ROUTES.GET_USER_COINS(userData.id))
+      const res = await api.get(
+        API_ROUTES.GET_USER_COINS(userData.id)
+      )
 
       if (res.data.success) {
-        console.log("✅ Balance refreshed:", res.data.balance)
         setBalance(res.data.balance)
       }
     } catch (err) {
@@ -47,30 +41,20 @@ export function CoinProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  // ==========================================
-  // ✅ AUTO REFRESH AFTER LOGIN
-  // ==========================================
+  // ✅ AUTO LOAD AFTER LOGIN
   useEffect(() => {
-    if (!userData?.id) return
-    refreshBalance()
-  }, [userData?.id])
+    if (userData?.id) {
+      refreshBalance()
+    }
+  }, [userData])
 
-  // ==========================================
-  // ✅ ADD COINS (Realtime UI)
-  // ==========================================
+  // ✅ REALTIME ADD
   const addCoins = (amount: number) => {
     setBalance((prev) => prev + amount)
   }
 
   return (
-    <CoinContext.Provider
-      value={{
-        balance,
-        setBalance,
-        addCoins,
-        refreshBalance,
-      }}
-    >
+    <CoinContext.Provider value={{ balance, refreshBalance, addCoins }}>
       {children}
     </CoinContext.Provider>
   )
