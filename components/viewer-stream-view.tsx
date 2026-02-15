@@ -1,5 +1,6 @@
 "use client"
 
+import type React from "react"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 
@@ -25,13 +26,15 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
   const [tokenError, setTokenError] = useState<string | null>(null)
 
   // ============================
-  // ✅ ROOM NAME MUST MATCH HOST
-  // Host uses: broom_${user.uid}
-  // Viewer must use: broom_${stream.host_id}
+  // ✅ ROOM NAME MATCH HOST UID
   // ============================
-  const roomName = stream.host_id ? `broom_${stream.host_id}` : null
+  const roomName = stream.host_uid ? `broom_${stream.host_uid}` : null
 
-  const { room, connect, disconnect, isConnected } = useLiveKit(roomName, token)
+  const { room, connect, disconnect, isConnected } = useLiveKit(
+    roomName,
+    token,
+    "viewer"
+  )
 
   // ============================
   // ✅ FETCH VIEWER TOKEN
@@ -79,10 +82,7 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
     if (!token) return
 
     connect()
-
-    return () => {
-      disconnect()
-    }
+    return () => disconnect()
   }, [token])
 
   // ============================
@@ -95,15 +95,12 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
       try {
         const msg = JSON.parse(new TextDecoder().decode(payload))
 
-        // 🛑 Stream End Event
         if (msg.type === "stream_end") {
           alert("🛑 Stream has ended")
-
           disconnect()
           router.push("/dashboard")
         }
 
-        // 🎁 Gift Event → forward to StreamWithChat UI
         if (msg.type === "gift") {
           window.dispatchEvent(
             new CustomEvent("livekit-gift", {
@@ -117,10 +114,7 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
     }
 
     room.on("dataReceived", handleData)
-
-    return () => {
-      room.off("dataReceived", handleData)
-    }
+    return () => room.off("dataReceived", handleData)
   }, [room])
 
   // ============================
@@ -168,12 +162,13 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
   }
 
   // ============================
-  // HOST VIDEO PUBLICATION
+  // HOST VIDEO TRACK
   // ============================
   const publication = hostParticipant.getTrackPublication(
     Track.Source.Camera
   )
 
+  const videoTrack = publication?.videoTrack ?? null
   const viewerCount = remoteParticipants.length + 1
 
   // ============================
@@ -182,8 +177,12 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
   return (
     <div className="flex flex-col h-screen bg-black relative">
       {/* VIDEO */}
-      {publication?.videoTrack ? (
-        <VideoPlayer track={publication} participant={hostParticipant} />
+      {videoTrack ? (
+        <VideoPlayer
+          track={publication}
+          participant={hostParticipant}
+          className="w-full h-full"
+        />
       ) : (
         <div className="flex items-center justify-center h-full text-white">
           <p>{isConnected ? "Waiting for host video..." : "Connecting..."}</p>

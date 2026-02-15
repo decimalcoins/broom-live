@@ -15,6 +15,7 @@ import { Button } from "./ui/button"
 import { Input } from "./ui/input"
 import { Textarea } from "./ui/textarea"
 import { Label } from "./ui/label"
+
 import { Video } from "lucide-react"
 
 import { api } from "@/lib/api"
@@ -24,7 +25,9 @@ interface CreateStreamDialogProps {
   onStreamCreated: (streamId: string) => void
 }
 
-export function CreateStreamDialog({ onStreamCreated }: CreateStreamDialogProps) {
+export function CreateStreamDialog({
+  onStreamCreated,
+}: CreateStreamDialogProps) {
   const { userData } = usePiAuth()
 
   const [open, setOpen] = useState(false)
@@ -32,26 +35,43 @@ export function CreateStreamDialog({ onStreamCreated }: CreateStreamDialogProps)
   const [description, setDescription] = useState("")
   const [creating, setCreating] = useState(false)
 
+  // ============================
+  // ✅ CREATE STREAM
+  // ============================
   const handleCreate = async () => {
-    if (!title.trim()) return
-    if (!userData) return alert("User not logged in")
+    if (!userData) {
+      alert("User not logged in")
+      return
+    }
+
+    if (!title.trim()) {
+      alert("Title is required")
+      return
+    }
 
     setCreating(true)
 
     try {
-      const res = await api.post<{ id: string }>(
-        API_ROUTES.CREATE_STREAM,
-        {
-          title: title.trim(),
-          description: description.trim(),
+      // ============================
+      // ✅ FIX: Correct Payload
+      // ============================
+      const res = await api.post(API_ROUTES.CREATE_STREAM, {
+        userId: userData.id,
+        title: title.trim(),
+        description: description.trim(),
+      })
 
-          // ✅ FIX REQUIRED FIELDS
-          host_id: userData.id,
-          host_username: userData.username,
-        }
-      )
+      if (!res.data.success) {
+        alert(res.data.error || "Failed to create stream")
+        return
+      }
 
-      onStreamCreated(res.data.id)
+      // ✅ Stream created successfully
+      const streamId = res.data.stream.id
+
+      onStreamCreated(streamId)
+
+      // Reset UI
       setOpen(false)
       setTitle("")
       setDescription("")
@@ -63,10 +83,17 @@ export function CreateStreamDialog({ onStreamCreated }: CreateStreamDialogProps)
     }
   }
 
+  // ============================
+  // UI
+  // ============================
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="lg" className="w-full gap-2">
+        <Button
+          size="lg"
+          className="w-full gap-2"
+          disabled={userData?.role !== "HOST"}
+        >
           <Video className="w-5 h-5" />
           Go Live
         </Button>
@@ -78,6 +105,7 @@ export function CreateStreamDialog({ onStreamCreated }: CreateStreamDialogProps)
         </DialogHeader>
 
         <div className="space-y-4 py-4">
+          {/* Title */}
           <div>
             <Label>Stream Title</Label>
             <Input
@@ -87,6 +115,7 @@ export function CreateStreamDialog({ onStreamCreated }: CreateStreamDialogProps)
             />
           </div>
 
+          {/* Description */}
           <div>
             <Label>Description</Label>
             <Textarea
@@ -96,6 +125,7 @@ export function CreateStreamDialog({ onStreamCreated }: CreateStreamDialogProps)
             />
           </div>
 
+          {/* Button */}
           <Button
             className="w-full"
             disabled={creating}

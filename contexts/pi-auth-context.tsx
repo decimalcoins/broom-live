@@ -70,10 +70,10 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
       setUserData(null)
 
       // ============================
-      // Wait until Pi Browser injects SDK
+      // Wait Pi SDK Inject
       // ============================
       let tries = 0
-      while (!window.Pi && tries < 20) {
+      while (!window.Pi && tries < 25) {
         await new Promise((r) => setTimeout(r, 400))
         tries++
       }
@@ -100,11 +100,11 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
 
       const auth: PiAuthResult = await window.Pi.authenticate(["username"])
 
-      // Save Token Globally
+      // Save token globally for all API calls
       setApiAuthToken(auth.accessToken)
 
       // ============================
-      // Backend Login (Token Verify Only)
+      // Backend Login (verify token)
       // ============================
       setAuthMessage("Verifying login token...")
 
@@ -113,8 +113,8 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
       })
 
       // ============================
-      // Fetch REAL user (/me)
-      // BONUS + ROLE AUTO HOST happens here
+      // Fetch REAL User Profile (/me)
+      // Bonus + Role Auto Unlock happens here
       // ============================
       setAuthMessage("Loading user profile...")
 
@@ -127,19 +127,22 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
         throw new Error(meRes.data.error || "Failed to load user profile")
       }
 
-      // ============================
-      // Save Final UserData
-      // ============================
-      setUserData(meRes.data.user)
+      // ✅ Always use latest user from backend
+      const freshUser: LoginDTO = meRes.data.user
+
+      // Save final user
+      setUserData(freshUser)
       setIsAuthenticated(true)
 
-      // Show Bonus Info
+      // ============================
+      // Message Bonus
+      // ============================
       if (meRes.data.bonus_awarded > 0) {
         setAuthMessage(
-          `🎉 Bonus +${meRes.data.bonus_awarded} Coins Received!`
+          `🎉 Welcome ${freshUser.username}! Bonus +${meRes.data.bonus_awarded} Coins!`
         )
       } else {
-        setAuthMessage("✅ Login Success")
+        setAuthMessage(`✅ Welcome back, ${freshUser.username}`)
       }
     } catch (err) {
       console.error("Pi Auth Error:", err)
@@ -147,9 +150,7 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  // ============================
   // Auto Init Once
-  // ============================
   useEffect(() => {
     init()
   }, [])

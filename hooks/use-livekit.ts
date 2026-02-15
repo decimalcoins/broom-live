@@ -11,12 +11,12 @@ import {
 
 import { LiveKitService } from "@/lib/livekit"
 
-type LiveKitRole = "host" | "viewer"
+export type LiveKitRole = "host" | "viewer"
 
 export function useLiveKit(
   roomName: string | null,
   token: string | null,
-  role: LiveKitRole = "viewer"
+  role: LiveKitRole
 ) {
   const [room, setRoom] = useState<Room | null>(null)
   const [isConnected, setIsConnected] = useState(false)
@@ -25,14 +25,8 @@ export function useLiveKit(
   const [cameraEnabled, setCameraEnabled] = useState(false)
   const [micEnabled, setMicEnabled] = useState(false)
 
-  // ✅ Service persistent
-  const serviceRef = useRef<LiveKitService | null>(null)
-
-  if (!serviceRef.current) {
-    serviceRef.current = new LiveKitService()
-  }
-
-  const livekitService = serviceRef.current
+  // ✅ Keep LiveKitService stable
+  const serviceRef = useRef<LiveKitService>(new LiveKitService())
 
   // ============================
   // ✅ CONNECT ROOM
@@ -45,38 +39,42 @@ export function useLiveKit(
       console.log("Room:", roomName)
       console.log("Role:", role)
 
-      const connectedRoom = await livekitService.connect({
+      const connectedRoom = await serviceRef.current.connect({
         url: process.env.NEXT_PUBLIC_LIVEKIT_URL!,
         token,
       })
 
       setRoom(connectedRoom)
-      setIsConnected(true)
 
-      console.log("✅ LiveKit Connected!")
-
-      // ✅ HOST publish cam+mic
-      if (role === "host") {
-        console.log("🎥 Host enabling camera...")
-        await connectedRoom.localParticipant.setCameraEnabled(true)
-        setCameraEnabled(true)
-
-        console.log("🎤 Host enabling mic...")
-        await connectedRoom.localParticipant.setMicrophoneEnabled(true)
-        setMicEnabled(true)
-      }
-
-      // Room events
-      connectedRoom.on(RoomEvent.Connected, () => {
-        console.log("✅ Room connected")
+      // ============================
+      // ✅ WAIT ROOM CONNECT EVENT
+      // ============================
+      connectedRoom.on(RoomEvent.Connected, async () => {
+        console.log("✅ Room Connected!")
         setIsConnected(true)
+
+        // ============================
+        // ✅ HOST AUTO ENABLE CAM+MIC
+        // ============================
+        if (role === "host") {
+          console.log("🎥 Enabling Host Camera...")
+          await connectedRoom.localParticipant.setCameraEnabled(true)
+          setCameraEnabled(true)
+
+          console.log("🎤 Enabling Host Microphone...")
+          await connectedRoom.localParticipant.setMicrophoneEnabled(true)
+          setMicEnabled(true)
+        }
       })
 
       connectedRoom.on(RoomEvent.Disconnected, () => {
-        console.log("❌ Room disconnected")
+        console.log("❌ Room Disconnected")
         setIsConnected(false)
       })
 
+      // ============================
+      // ✅ TRACK SUBSCRIBE LOG
+      // ============================
       connectedRoom.on(
         RoomEvent.TrackSubscribed,
         (
@@ -85,7 +83,7 @@ export function useLiveKit(
           participant: RemoteParticipant
         ) => {
           console.log(
-            "📡 Track subscribed:",
+            "📡 Track Subscribed:",
             track.kind,
             "from",
             participant.identity
@@ -93,10 +91,10 @@ export function useLiveKit(
         }
       )
     } catch (err) {
-      console.error("❌ LiveKit connection error:", err)
+      console.error("❌ LiveKit connect error:", err)
       setError(err instanceof Error ? err.message : "Failed to connect")
     }
-  }, [roomName, token, role, livekitService])
+  }, [roomName, token, role])
 
   // ============================
   // ✅ DISCONNECT ROOM
@@ -104,16 +102,17 @@ export function useLiveKit(
   const disconnect = useCallback(() => {
     console.log("🔌 Disconnecting LiveKit...")
 
-    livekitService.disconnect()
+    serviceRef.current.disconnect()
 
     setRoom(null)
     setIsConnected(false)
+
     setCameraEnabled(false)
     setMicEnabled(false)
-  }, [livekitService])
+  }, [])
 
   // ============================
-  // 🎥 CAMERA TOGGLE (HOST ONLY)
+  // 🎥 TOGGLE CAMERA (HOST ONLY)
   // ============================
   const toggleCamera = useCallback(async () => {
     if (!room) return
@@ -126,7 +125,7 @@ export function useLiveKit(
   }, [room, cameraEnabled, role])
 
   // ============================
-  // 🎤 MIC TOGGLE (HOST ONLY)
+  // 🎤 TOGGLE MIC (HOST ONLY)
   // ============================
   const toggleMic = useCallback(async () => {
     if (!room) return
@@ -145,24 +144,24 @@ export function useLiveKit(
     (message: any) => {
       if (!room) return
 
-      try {
-        const payload = new TextEncoder().encode(JSON.stringify(message))
+      const payload = new TextEncoder().encode(JSON.stringify(message))
 
-        room.localParticipant.publishData(payload, {
-          reliable: true,
-        })
+      room.localParticipant.publishData(payload, {
+        reliable: true,
+      })
 
-        console.log("📨 Data sent:", message)
-      } catch (err) {
-        console.error("❌ Failed to send data:", err)
-      }
+      console.log("📨 Data sent:", message)
     },
     [room]
   )
 
-  // Cleanup
+  // ============================
+  // ✅ CLEANUP SAFE
+  // ============================
   useEffect(() => {
-    return () => disconnect()
+    return () => {
+      disconnect()
+    }
   }, [disconnect])
 
   return {
@@ -170,13 +169,11 @@ export function useLiveKit(
     isConnected,
     error,
 
-    // host-only controls
     cameraEnabled,
     micEnabled,
     toggleCamera,
     toggleMic,
 
-    // realtime data channel
     sendData,
 
     connect,

@@ -23,10 +23,7 @@ interface HostStreamViewProps {
   onEndStream: () => void
 }
 
-export function HostStreamView({
-  streamId,
-  onEndStream,
-}: HostStreamViewProps) {
+export function HostStreamView({ streamId, onEndStream }: HostStreamViewProps) {
   const { userData } = usePiAuth()
   const { addCoins } = useCoins()
 
@@ -37,13 +34,12 @@ export function HostStreamView({
   const [tokenError, setTokenError] = useState<string | null>(null)
 
   // ===============================
-  // ✅ ROOM NAME FIXED (UID)
-  // Host + Viewer MUST MATCH THIS
+  // ✅ ROOM NAME MUST MATCH VIEWER
   // ===============================
   const roomName = userData?.uid ? `broom_${userData.uid}` : null
 
   // ===============================
-  // LIVEKIT HOOK
+  // ✅ LIVEKIT HOOK (HOST ROLE FIX)
   // ===============================
   const {
     room,
@@ -54,7 +50,7 @@ export function HostStreamView({
     disconnect,
     toggleCamera,
     toggleMic,
-  } = useLiveKit(roomName, token)
+  } = useLiveKit(roomName, token, "host")
 
   // ===============================
   // ✅ FETCH HOST TOKEN
@@ -96,27 +92,15 @@ export function HostStreamView({
   }, [roomName, userData?.username])
 
   // ===============================
-  // ✅ CONNECT ROOM WHEN TOKEN READY
+  // ✅ CONNECT WHEN TOKEN READY
   // ===============================
   useEffect(() => {
     if (!token) return
 
     connect()
 
-    return () => {
-      disconnect()
-    }
-  }, [token])
-
-  // ===============================
-  // ✅ AUTO ENABLE CAM + MIC ONCE
-  // ===============================
-  useEffect(() => {
-    if (!room || !isConnected) return
-
-    room.localParticipant.setCameraEnabled(true)
-    room.localParticipant.setMicrophoneEnabled(true)
-  }, [room, isConnected])
+    return () => disconnect()
+  }, [token, connect, disconnect])
 
   // ===============================
   // ✅ LISTEN GIFTS REALTIME
@@ -142,11 +126,8 @@ export function HostStreamView({
     }
 
     room.on("dataReceived", handleData)
-
-    return () => {
-      room.off("dataReceived", handleData)
-    }
-  }, [room])
+    return () => room.off("dataReceived", handleData)
+  }, [room, addCoins])
 
   // ===============================
   // ✅ END STREAM
@@ -155,7 +136,7 @@ export function HostStreamView({
     if (!room || !userData) return
 
     try {
-      // Broadcast END event
+      // Notify viewers
       room.localParticipant.publishData(
         new TextEncoder().encode(
           JSON.stringify({
@@ -210,12 +191,11 @@ export function HostStreamView({
   }
 
   // ===============================
-  // ✅ LOCAL VIDEO TRACK SAFE
+  // ✅ LOCAL CAMERA TRACK PUBLICATION
   // ===============================
-  const publication =
-    room.localParticipant.getTrackPublication(Track.Source.Camera)
-
-  const localVideoTrack = publication?.videoTrack ?? null
+  const publication = room.localParticipant.getTrackPublication(
+    Track.Source.Camera
+  )
 
   // ===============================
   // MAIN HOST UI
@@ -224,8 +204,8 @@ export function HostStreamView({
     <LiveKitProvider room={room}>
       <div className="flex flex-col h-screen bg-black relative">
         {/* VIDEO */}
-        {localVideoTrack ? (
-          <VideoPlayer track={localVideoTrack} isLocal />
+        {publication ? (
+          <VideoPlayer track={publication} isLocal />
         ) : (
           <div className="flex items-center justify-center h-full text-white">
             <p>📷 Camera is off</p>
@@ -241,7 +221,7 @@ export function HostStreamView({
           </Card>
         </div>
 
-        {/* 🎁 Gift */}
+        {/* 🎁 Gift Animation */}
         {giftEvent && (
           <GiftAnimation
             gift={giftEvent}

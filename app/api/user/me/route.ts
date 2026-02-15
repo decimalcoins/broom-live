@@ -34,10 +34,9 @@ export async function POST(req: Request) {
     let bonusCoins = 0
 
     // =========================================
-    // 2. Jika user BARU → buat akun + bonus sekali
+    // 2. Jika user baru → create + bonus tier
     // =========================================
     if (!user) {
-      // ✅ login_order pakai login_counter (aman)
       const counterRes = await client.query(
         `
         UPDATE login_counter
@@ -49,9 +48,6 @@ export async function POST(req: Request) {
 
       const loginOrder = counterRes.rows[0].current_value
 
-      // =========================================
-      // Tentukan bonus tier
-      // =========================================
       let role = "VIEWER"
 
       if (loginOrder >= 1 && loginOrder <= 20) {
@@ -62,9 +58,6 @@ export async function POST(req: Request) {
         role = "HOST"
       }
 
-      // =========================================
-      // Create user langsung dengan role final
-      // =========================================
       const createRes = await client.query(
         `
         INSERT INTO users (
@@ -74,27 +67,18 @@ export async function POST(req: Request) {
           coin_balance,
           login_order
         )
-        VALUES ($1, $2, $3, $4, $5)
+        VALUES ($1,$2,$3,$4,$5)
         RETURNING *
         `,
-        [
-          uid,
-          username || "Pioneer",
-          role,
-          bonusCoins,
-          loginOrder,
-        ]
+        [uid, username || "Pioneer", role, bonusCoins, loginOrder]
       )
 
       user = createRes.rows[0]
 
-      // =========================================
-      // Simpan bonus claim record (sekali seumur hidup)
-      // =========================================
       await client.query(
         `
         INSERT INTO login_bonus_claims (user_id, bonus_amount)
-        VALUES ($1, $2)
+        VALUES ($1,$2)
         `,
         [user.id, bonusCoins]
       )
@@ -103,18 +87,22 @@ export async function POST(req: Request) {
     await client.query("COMMIT")
 
     // =========================================
-    // 3. Return user final
+    // ✅ ALWAYS RETURN UPDATED USER BALANCE
     // =========================================
+    const finalUserRes = await db.query(
+      `
+      SELECT id, uid, username, role,
+             coin_balance, login_order
+      FROM users
+      WHERE uid=$1
+      LIMIT 1
+      `,
+      [uid]
+    )
+
     return NextResponse.json({
       success: true,
-      user: {
-        id: user.id,
-        uid: user.uid,
-        username: user.username,
-        role: user.role,
-        coin_balance: user.coin_balance,
-        login_order: user.login_order,
-      },
+      user: finalUserRes.rows[0],
       bonus_awarded: bonusCoins,
     })
   } catch (err) {

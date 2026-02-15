@@ -10,6 +10,7 @@ export async function GET() {
       SELECT
         id,
         host_id,
+        host_uid,          -- ✅ IMPORTANT FIX
         host_username,
         title,
         description,
