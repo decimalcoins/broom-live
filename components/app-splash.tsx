@@ -3,20 +3,14 @@
 import { useEffect, useState } from "react"
 
 export function AppSplash({ children }: { children: React.ReactNode }) {
-  const [showSplash, setShowSplash] = useState(false)
+  const [showSplash, setShowSplash] = useState(true)
 
   useEffect(() => {
-    const hasOpened = localStorage.getItem("broom_opened")
+    const timer = setTimeout(() => {
+      setShowSplash(false)
+    }, 2000)
 
-    // ✅ Jika belum pernah buka app → tampilkan splash
-    if (!hasOpened) {
-      setShowSplash(true)
-
-      setTimeout(() => {
-        setShowSplash(false)
-        localStorage.setItem("broom_opened", "yes")
-      }, 3000) // splash 3 detik
-    }
+    return () => clearTimeout(timer)
   }, [])
 
   if (showSplash) {
@@ -25,16 +19,11 @@ export function AppSplash({ children }: { children: React.ReactNode }) {
         <div className="text-center space-y-4">
           <img
             src="/broom-logo.png"
-            className="w-32 h-32 mx-auto animate-pulse"
+            className="w-28 h-28 mx-auto animate-pulse"
             alt="Broom Logo"
           />
-
           <p className="text-white text-xl font-bold">
             Welcome to Broom Live
-          </p>
-
-          <p className="text-white/60 text-sm">
-            Loading app...
           </p>
         </div>
       </div>

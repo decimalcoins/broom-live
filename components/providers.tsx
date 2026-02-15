@@ -5,11 +5,14 @@ import type { ReactNode } from "react"
 import { PiAuthProvider } from "@/contexts/pi-auth-context"
 import { CoinProvider } from "@/contexts/coin-context"
 
+import { AppSplash } from "@/components/app-splash"
+
 export function Providers({ children }: { children: ReactNode }) {
   return (
-    <PiAuthProvider>
-      {/* ✅ CoinProvider MUST be inside PiAuthProvider */}
-      <CoinProvider>{children}</CoinProvider>
-    </PiAuthProvider>
+    <AppSplash>
+      <PiAuthProvider>
+        <CoinProvider>{children}</CoinProvider>
+      </PiAuthProvider>
+    </AppSplash>
   )
 }

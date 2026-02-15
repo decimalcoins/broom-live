@@ -1,15 +1,28 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
+
 import { usePiAuth } from "@/contexts/pi-auth-context"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+
 import { Coins, TrendingUp } from "lucide-react"
+
 import { api } from "@/lib/api"
 import { API_ROUTES } from "@/lib/api-routes"
+
 import type { Transaction, Withdrawal } from "@/lib/types"
 import { coinsToPi } from "@/lib/constants"
-import { useRouter } from "next/navigation"
+
 import { CreateStreamDialog } from "@/components/create-stream-dialog"
 import { WithdrawalRequestDialog } from "@/components/withdrawal-request-dialog"
 
@@ -17,54 +30,73 @@ export default function HostDashboardPage() {
   const { userData, authMessage, isAuthenticated } = usePiAuth()
   const router = useRouter()
 
-  const [coinBalance, setCoinBalance] = useState(0)
+  // ✅ Default balance langsung dari login
+  const [coinBalance, setCoinBalance] = useState(
+    userData?.coin_balance ?? 0
+  )
+
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([])
   const [loading, setLoading] = useState(true)
 
   // ============================
-  // ✅ HOST ROLE GUARD
-  // ============================
-  useEffect(() => {
-    if (!isAuthenticated) return
-
-    if (!userData) return
-
-    // ❌ Jika bukan HOST → redirect
-    if (userData.role !== "HOST") {
-      router.push("/dashboard")
-      return
-    }
-
-    // ✅ Kalau HOST → load dashboard
-    fetchDashboardData()
-  }, [userData, isAuthenticated])
-
-  // ============================
-  // Fetch Host Dashboard Data
+  // ✅ FETCH DASHBOARD DATA
   // ============================
   const fetchDashboardData = async () => {
     if (!userData) return
 
     try {
+      setLoading(true)
+
       const [coinsRes, transactionsRes, withdrawalsRes] = await Promise.all([
-        api.get<{ balance: number }>(API_ROUTES.GET_USER_COINS(userData.id)),
-        api.get<Transaction[]>(API_ROUTES.GET_TRANSACTIONS(userData.id)),
-        api.get<Withdrawal[]>(API_ROUTES.GET_WITHDRAWALS(userData.id)),
+        api.get<{ success: boolean; balance: number }>(
+          API_ROUTES.GET_USER_COINS(userData.id)
+        ),
+
+        api.get<{ success: boolean; transactions: Transaction[] }>(
+          API_ROUTES.GET_TRANSACTIONS(userData.id)
+        ),
+
+        api.get<{ success: boolean; withdrawals: Withdrawal[] }>(
+          API_ROUTES.GET_WITHDRAWALS(userData.id)
+        ),
       ])
 
-      setCoinBalance(coinsRes.data.balance)
-      setTransactions(transactionsRes.data)
-      setWithdrawals(withdrawalsRes.data)
+      if (coinsRes.data.success) {
+        setCoinBalance(coinsRes.data.balance)
+      }
+
+      if (transactionsRes.data.success) {
+        setTransactions(transactionsRes.data.transactions)
+      }
+
+      if (withdrawalsRes.data.success) {
+        setWithdrawals(withdrawalsRes.data.withdrawals)
+      }
     } catch (err) {
-      console.error("❌ Failed to fetch dashboard data:", err)
+      console.error("❌ Dashboard fetch failed:", err)
     } finally {
       setLoading(false)
     }
   }
 
   // ============================
-  // Loading Auth
+  // ✅ HOST ROLE GUARD
+  // ============================
+  useEffect(() => {
+    if (!isAuthenticated) return
+    if (!userData) return
+
+    if (userData.role !== "HOST") {
+      router.push("/dashboard")
+      return
+    }
+
+    fetchDashboardData()
+  }, [userData, isAuthenticated])
+
+  // ============================
+  // AUTH LOADING
   // ============================
   if (!isAuthenticated) {
     return (
@@ -74,9 +106,6 @@ export default function HostDashboardPage() {
     )
   }
 
-  // ============================
-  // Loading Dashboard
-  // ============================
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -86,7 +115,7 @@ export default function HostDashboardPage() {
   }
 
   // ============================
-  // Dashboard Stats
+  // STATS
   // ============================
   const totalEarnings = transactions
     .filter((t) => t.type === "gift_received")
@@ -97,18 +126,19 @@ export default function HostDashboardPage() {
   return (
     <div className="min-h-screen bg-background pb-20">
       <div className="container mx-auto px-4 py-6 max-w-4xl">
+
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-3xl font-bold">Host Dashboard</h1>
-            <p className="text-muted-foreground">
-              Manage your streams and earnings
-            </p>
-          </div>
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold">Host Dashboard</h1>
+          <p className="text-muted-foreground">
+            Manage your streams and earnings
+          </p>
         </div>
 
-        {/* Stats Cards */}
+        {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+
+          {/* Coin Balance */}
           <Card>
             <CardHeader className="pb-3">
               <CardDescription>Coin Balance</CardDescription>
@@ -124,6 +154,7 @@ export default function HostDashboardPage() {
             </CardContent>
           </Card>
 
+          {/* Earnings */}
           <Card>
             <CardHeader className="pb-3">
               <CardDescription>Total Earnings</CardDescription>
@@ -139,6 +170,7 @@ export default function HostDashboardPage() {
             </CardContent>
           </Card>
 
+          {/* Pending */}
           <Card>
             <CardHeader className="pb-3">
               <CardDescription>Pending Withdrawals</CardDescription>
@@ -158,9 +190,10 @@ export default function HostDashboardPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <CreateStreamDialog
             onStreamCreated={(streamId) =>
-              router.push(`/stream/${streamId}/host`)
+              router.push(`/stream/${streamId}`)
             }
           />
+
           <WithdrawalRequestDialog
             coinBalance={coinBalance}
             onSuccess={fetchDashboardData}
@@ -168,14 +201,14 @@ export default function HostDashboardPage() {
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="transactions" className="w-full">
+        <Tabs defaultValue="transactions">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="transactions">Transactions</TabsTrigger>
             <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
           </TabsList>
 
           {/* Transactions */}
-          <TabsContent value="transactions" className="space-y-3 mt-4">
+          <TabsContent value="transactions" className="mt-4 space-y-3">
             {transactions.length === 0 ? (
               <Card>
                 <CardContent className="py-8 text-center text-muted-foreground">
@@ -183,20 +216,19 @@ export default function HostDashboardPage() {
                 </CardContent>
               </Card>
             ) : (
-              transactions.map((transaction) => (
-                <Card key={transaction.id}>
+              transactions.map((t) => (
+                <Card key={t.id}>
                   <CardContent className="py-4 flex justify-between">
                     <div>
                       <p className="font-medium capitalize">
-                        {transaction.type.replace(/_/g, " ")}
+                        {t.type.replace(/_/g, " ")}
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        {new Date(transaction.created_at).toLocaleString()}
+                        {new Date(t.created_at).toLocaleString()}
                       </p>
                     </div>
                     <p className="font-bold">
-                      +{transaction.amount.toLocaleString()}{" "}
-                      {transaction.currency}
+                      +{t.amount.toLocaleString()} {t.currency}
                     </p>
                   </CardContent>
                 </Card>
@@ -205,7 +237,7 @@ export default function HostDashboardPage() {
           </TabsContent>
 
           {/* Withdrawals */}
-          <TabsContent value="withdrawals" className="space-y-3 mt-4">
+          <TabsContent value="withdrawals" className="mt-4 space-y-3">
             {withdrawals.length === 0 ? (
               <Card>
                 <CardContent className="py-8 text-center text-muted-foreground">
@@ -213,18 +245,18 @@ export default function HostDashboardPage() {
                 </CardContent>
               </Card>
             ) : (
-              withdrawals.map((withdrawal) => (
-                <Card key={withdrawal.id}>
+              withdrawals.map((w) => (
+                <Card key={w.id}>
                   <CardContent className="py-4 flex justify-between">
                     <div>
                       <p className="font-medium">
-                        {withdrawal.coin_amount.toLocaleString()} Coins
+                        {w.coin_amount.toLocaleString()} Coins
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        {new Date(withdrawal.requested_at).toLocaleString()}
+                        {new Date(w.requested_at).toLocaleString()}
                       </p>
                     </div>
-                    <span className="font-bold">{withdrawal.status}</span>
+                    <span className="font-bold">{w.status}</span>
                   </CardContent>
                 </Card>
               ))

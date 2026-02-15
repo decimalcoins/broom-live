@@ -7,6 +7,7 @@ import { GeistMono } from "geist/font/mono"
 
 import "./globals.css"
 import { Providers } from "@/components/providers"
+import { AppSplash } from "@/components/app-splash" // ✅ ADD THIS
 
 export const metadata: Metadata = {
   title: "Broom Live",
@@ -38,7 +39,10 @@ export default function RootLayout({
       </head>
 
       <body>
-        <Providers>{children}</Providers>
+        {/* ✅ Splash wraps everything */}
+        <AppSplash>
+          <Providers>{children}</Providers>
+        </AppSplash>
       </body>
     </html>
   )
