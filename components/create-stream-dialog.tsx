@@ -41,6 +41,14 @@ export function CreateStreamDialog({
       return
     }
 
+    // ✅ FIX: Support id OR uid
+    const userKey = userData.id || userData.uid
+
+    if (!userKey) {
+      alert("❌ User identifier missing (id/uid)")
+      return
+    }
+
     if (!title.trim()) {
       alert("❌ Title required")
       return
@@ -50,12 +58,11 @@ export function CreateStreamDialog({
 
     try {
       const res = await api.post(API_ROUTES.CREATE_STREAM, {
-        userId: userData.id,
+        userId: userKey,
         title: title.trim(),
         description: description.trim(),
       })
 
-      // ✅ Backend error message
       if (!res.data.success) {
         alert("❌ " + (res.data.error || "Stream create failed"))
         return
@@ -73,10 +80,11 @@ export function CreateStreamDialog({
     } catch (err: any) {
       console.error("❌ STREAM CREATE ERROR:", err)
 
-      // ✅ tampilkan error asli
       alert(
         "❌ Failed to create stream:\n" +
-          (err?.data?.error || err.message || "Unknown error")
+          (err?.response?.data?.error ||
+            err.message ||
+            "Unknown error")
       )
     } finally {
       setCreating(false)
