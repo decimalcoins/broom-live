@@ -8,6 +8,8 @@ export async function GET(
   try {
     const userId = context.params.id
 
+    console.log("✅ COIN API HIT:", userId)
+
     if (!userId) {
       return NextResponse.json(
         { success: false, error: "User ID required" },
@@ -15,7 +17,6 @@ export async function GET(
       )
     }
 
-    // ✅ Support ID or UID
     const res = await db.query(
       `
       SELECT id, uid, username, coin_balance
