@@ -9,14 +9,18 @@ export const API_ROUTES = {
   // USERS
   // ============================
 
+  // ✅ Get user profile
   GET_USER: (id: string) => `/api/users/${id}`,
 
-  // ✅ FIXED CORRECT COIN ENDPOINT
-  GET_USER_COINS: (id: string) => `/api/users/${id}/coins`,
+  // ✅ FINAL FIX: Coin balance endpoint (sesuai struktur project kamu)
+  // Folder asli:
+  // app/api/user/[id]/coin/route.ts
+  GET_USER_COINS: (id: string) => `/api/user/${id}/coin`,
 
-  GET_TRANSACTIONS: (id: string) =>
-    `/api/users/${id}/transactions`,
+  // ✅ Transactions history
+  GET_TRANSACTIONS: (id: string) => `/api/users/${id}/transactions`,
 
+  // ✅ Current logged user (Pi Auth)
   GET_ME: `/api/user/me`,
 
   // ============================
@@ -35,8 +39,7 @@ export const API_ROUTES = {
   LIVE_STREAMS: `/api/streams/live`,
 
   // ✅ Viewer token per stream
-  VIEWER_TOKEN: (id: string) =>
-    `/api/streams/${id}/viewer-token`,
+  VIEWER_TOKEN: (id: string) => `/api/streams/${id}/viewer-token`,
 
   // ============================
   // GIFTS
@@ -61,8 +64,7 @@ export const API_ROUTES = {
   // WITHDRAWALS
   // ============================
 
-  GET_WITHDRAWALS: (hostId: string) =>
-    `/api/withdrawals/host/${hostId}`,
+  GET_WITHDRAWALS: (hostId: string) => `/api/withdrawals/host/${hostId}`,
 
   REQUEST_WITHDRAWAL: `/api/withdrawals/request`,
 
