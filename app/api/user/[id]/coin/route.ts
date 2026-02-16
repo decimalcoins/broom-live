@@ -16,13 +16,13 @@ export async function GET(
     }
 
     // ============================
-    // ✅ Fetch coin_balance from DB
+    // ✅ FIX: Support ID or UID
     // ============================
     const res = await db.query(
       `
-      SELECT coin_balance
+      SELECT id, uid, username, coin_balance
       FROM users
-      WHERE id=$1
+      WHERE id=$1 OR uid=$1
       LIMIT 1
       `,
       [userId]
@@ -37,7 +37,8 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
-      balance: res.rows[0].coin_balance,
+      balance: Number(res.rows[0].coin_balance),
+      user: res.rows[0],
     })
   } catch (err) {
     console.error("❌ COIN FETCH ERROR:", err)
