@@ -30,13 +30,58 @@ export default function HostDashboardPage() {
   const { userData, authMessage, isAuthenticated } = usePiAuth()
   const router = useRouter()
 
-  const [coinBalance, setCoinBalance] = useState<number>(0)
+  const [coinBalance, setCoinBalance] = useState(0)
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([])
   const [loading, setLoading] = useState(true)
 
   // ============================
-  // ✅ LOAD HOST DASHBOARD
+  // ✅ FETCH DASHBOARD
+  // ============================
+  const fetchDashboardData = async () => {
+    if (!userData) return
+
+    try {
+      setLoading(true)
+
+      // ✅ Coins API
+      const coinsRes = await api.get<{
+        success: boolean
+        balance: number
+      }>(API_ROUTES.GET_USER_COINS(userData.id))
+
+      if (coinsRes.data.success) {
+        setCoinBalance(coinsRes.data.balance)
+      }
+
+      // ✅ Transactions API
+      const txRes = await api.get<{
+        success: boolean
+        transactions: Transaction[]
+      }>(API_ROUTES.GET_TRANSACTIONS(userData.id))
+
+      if (txRes.data.success) {
+        setTransactions(txRes.data.transactions)
+      }
+
+      // ✅ Withdrawals API
+      const wdRes = await api.get<{
+        success: boolean
+        withdrawals: Withdrawal[]
+      }>(API_ROUTES.GET_WITHDRAWALS(userData.id))
+
+      if (wdRes.data.success) {
+        setWithdrawals(wdRes.data.withdrawals)
+      }
+    } catch (err) {
+      console.error("❌ Host dashboard error:", err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // ============================
+  // ✅ ROLE GUARD
   // ============================
   useEffect(() => {
     if (!isAuthenticated) return
@@ -47,54 +92,11 @@ export default function HostDashboardPage() {
       return
     }
 
-    loadDashboard()
+    fetchDashboardData()
   }, [userData, isAuthenticated])
 
   // ============================
-  // ✅ FETCH DATA FROM API ONLY
-  // ============================
-  const loadDashboard = async () => {
-    try {
-      setLoading(true)
-
-      // ✅ Coins
-      const coinsRes = await api.get<{
-        success: boolean
-        balance: number
-      }>(API_ROUTES.GET_USER_COINS(userData!.id))
-
-      if (coinsRes.data.success) {
-        setCoinBalance(coinsRes.data.balance)
-      }
-
-      // ✅ Transactions
-      const trxRes = await api.get<{
-        success: boolean
-        transactions: Transaction[]
-      }>(API_ROUTES.GET_TRANSACTIONS(userData!.id))
-
-      if (trxRes.data.success) {
-        setTransactions(trxRes.data.transactions)
-      }
-
-      // ✅ Withdrawals
-      const wdRes = await api.get<{
-        success: boolean
-        withdrawals: Withdrawal[]
-      }>(API_ROUTES.GET_WITHDRAWALS(userData!.id))
-
-      if (wdRes.data.success) {
-        setWithdrawals(wdRes.data.withdrawals)
-      }
-    } catch (err) {
-      console.error("❌ Dashboard load error:", err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // ============================
-  // AUTH LOADING
+  // UI STATES
   // ============================
   if (!isAuthenticated) {
     return (
@@ -124,141 +126,64 @@ export default function HostDashboardPage() {
   return (
     <div className="min-h-screen bg-background pb-20">
       <div className="container mx-auto px-4 py-6 max-w-4xl">
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold">Host Dashboard</h1>
-          <p className="text-muted-foreground">
-            Manage your streams and earnings
-          </p>
-        </div>
+
+        <h1 className="text-3xl font-bold mb-2">Host Dashboard</h1>
+        <p className="text-muted-foreground mb-6">
+          Manage your streams and earnings
+        </p>
 
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          {/* Coin Balance */}
+
+          {/* Balance */}
           <Card>
-            <CardHeader className="pb-3">
+            <CardHeader>
               <CardDescription>Coin Balance</CardDescription>
-              <CardTitle className="text-3xl flex items-center gap-2">
-                <Coins className="w-6 h-6 text-yellow-500" />
+              <CardTitle className="text-3xl flex gap-2 items-center">
+                <Coins className="w-6 h-6" />
                 {coinBalance.toLocaleString()}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">
-                ≈ {coinsToPi(coinBalance).toFixed(4)} Pi
-              </p>
+              ≈ {coinsToPi(coinBalance).toFixed(4)} Pi
             </CardContent>
           </Card>
 
           {/* Earnings */}
           <Card>
-            <CardHeader className="pb-3">
+            <CardHeader>
               <CardDescription>Total Earnings</CardDescription>
-              <CardTitle className="text-3xl flex items-center gap-2">
-                <TrendingUp className="w-6 h-6 text-green-500" />
+              <CardTitle className="text-3xl flex gap-2 items-center">
+                <TrendingUp className="w-6 h-6" />
                 {totalEarnings.toLocaleString()}
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Coins earned from gifts
-              </p>
-            </CardContent>
+            <CardContent>Coins earned from gifts</CardContent>
           </Card>
 
-          {/* Pending Withdrawals */}
+          {/* Pending */}
           <Card>
-            <CardHeader className="pb-3">
+            <CardHeader>
               <CardDescription>Pending Withdrawals</CardDescription>
               <CardTitle className="text-3xl">
                 {pendingWithdrawals.length}
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Awaiting approval
-              </p>
-            </CardContent>
+            <CardContent>Awaiting approval</CardContent>
           </Card>
         </div>
 
         {/* Actions */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <CreateStreamDialog
-            onStreamCreated={(streamId) =>
-              router.push(`/stream/${streamId}/host`)
-            }
+            onStreamCreated={(id) => router.push(`/stream/${id}/host`)}
           />
 
           <WithdrawalRequestDialog
             coinBalance={coinBalance}
-            onSuccess={loadDashboard}
+            onSuccess={fetchDashboardData}
           />
         </div>
-
-        {/* Tabs */}
-        <Tabs defaultValue="transactions">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="transactions">Transactions</TabsTrigger>
-            <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
-          </TabsList>
-
-          {/* Transactions */}
-          <TabsContent value="transactions" className="mt-4 space-y-3">
-            {transactions.length === 0 ? (
-              <Card>
-                <CardContent className="py-8 text-center text-muted-foreground">
-                  No transactions yet
-                </CardContent>
-              </Card>
-            ) : (
-              transactions.map((t) => (
-                <Card key={t.id}>
-                  <CardContent className="py-4 flex justify-between">
-                    <div>
-                      <p className="font-medium capitalize">
-                        {t.type.replace(/_/g, " ")}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {new Date(t.created_at).toLocaleString()}
-                      </p>
-                    </div>
-                    <p className="font-bold">
-                      +{t.amount.toLocaleString()} {t.currency}
-                    </p>
-                  </CardContent>
-                </Card>
-              ))
-            )}
-          </TabsContent>
-
-          {/* Withdrawals */}
-          <TabsContent value="withdrawals" className="mt-4 space-y-3">
-            {withdrawals.length === 0 ? (
-              <Card>
-                <CardContent className="py-8 text-center text-muted-foreground">
-                  No withdrawal requests yet
-                </CardContent>
-              </Card>
-            ) : (
-              withdrawals.map((w) => (
-                <Card key={w.id}>
-                  <CardContent className="py-4 flex justify-between">
-                    <div>
-                      <p className="font-medium">
-                        {w.coin_amount.toLocaleString()} Coins
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {new Date(w.requested_at).toLocaleString()}
-                      </p>
-                    </div>
-                    <span className="font-bold">{w.status}</span>
-                  </CardContent>
-                </Card>
-              ))
-            )}
-          </TabsContent>
-        </Tabs>
       </div>
     </div>
   )
