@@ -9,19 +9,14 @@ export const API_ROUTES = {
   // USERS
   // ============================
 
-  // ✅ Get user profile
   GET_USER: (id: string) => `/api/users/${id}`,
 
-  // ✅ FIXED: Coin balance endpoint
-  // File asli kamu:
-  // app/api/user/[id]/coin/route.ts
-  GET_USER_COINS: (id: string) => `/api/user/${id}/coin`,
+  // ✅ FIXED CORRECT COIN ENDPOINT
+  GET_USER_COINS: (id: string) => `/api/users/${id}/coins`,
 
-  // ✅ Transactions history
   GET_TRANSACTIONS: (id: string) =>
     `/api/users/${id}/transactions`,
 
-  // ✅ Current logged user (Pi Auth)
   GET_ME: `/api/user/me`,
 
   // ============================
