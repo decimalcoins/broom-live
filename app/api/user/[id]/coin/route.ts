@@ -2,11 +2,11 @@ import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
 
 export async function GET(
-  req: Request,
-  { params }: { params: { id: string } }
+  request: Request,
+  context: { params: { id: string } }
 ) {
   try {
-    const userId = params.id
+    const userId = context.params.id
 
     if (!userId) {
       return NextResponse.json(
@@ -15,9 +15,7 @@ export async function GET(
       )
     }
 
-    // ============================
-    // ✅ FIX: Support ID or UID
-    // ============================
+    // ✅ Support ID or UID
     const res = await db.query(
       `
       SELECT id, uid, username, coin_balance
