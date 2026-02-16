@@ -41,15 +41,23 @@ export default function HostDashboardPage() {
   const fetchDashboardData = async () => {
     if (!userData) return
 
+    // ✅ FIX: Always use uid OR id
+    const userKey = userData.uid || userData.id
+
+    if (!userKey) {
+      console.error("❌ Missing user identifier:", userData)
+      return
+    }
+
     try {
       setLoading(true)
 
-      // ✅ DEBUG LOG
-      console.log("Fetching coin balance for:", userData.id)
+      console.log("✅ Fetching Host Dashboard for:", userKey)
 
-      const coinsRes = await api.get(
-        API_ROUTES.GET_USER_COINS(userData.id)
-      )
+      // ============================
+      // COIN BALANCE
+      // ============================
+      const coinsRes = await api.get(API_ROUTES.GET_USER_COINS(userKey))
 
       console.log("Coin API Response:", coinsRes.data)
 
@@ -57,35 +65,44 @@ export default function HostDashboardPage() {
         setCoinBalance(coinsRes.data.balance)
       }
 
+      // ============================
+      // TRANSACTIONS
+      // ============================
       const transactionsRes = await api.get(
-        API_ROUTES.GET_TRANSACTIONS(userData.id)
+        API_ROUTES.GET_TRANSACTIONS(userKey)
       )
 
       if (transactionsRes.data.success) {
         setTransactions(transactionsRes.data.transactions)
       }
 
+      // ============================
+      // WITHDRAWALS
+      // ============================
       const withdrawalsRes = await api.get(
-        API_ROUTES.GET_WITHDRAWALS(userData.id)
+        API_ROUTES.GET_WITHDRAWALS(userKey)
       )
 
       if (withdrawalsRes.data.success) {
         setWithdrawals(withdrawalsRes.data.withdrawals)
       }
     } catch (err) {
-      console.error("❌ Failed to fetch dashboard data:", err)
+      console.error("❌ Failed to fetch host dashboard data:", err)
     } finally {
       setLoading(false)
     }
   }
 
   // ============================
-  // ROLE GUARD
+  // ROLE GUARD + INIT FETCH
   // ============================
   useEffect(() => {
     if (!isAuthenticated) return
     if (!userData) return
 
+    console.log("✅ USER DATA FULL:", userData)
+
+    // Only HOST allowed
     if (userData.role !== "HOST") {
       router.push("/dashboard")
       return
@@ -95,7 +112,7 @@ export default function HostDashboardPage() {
   }, [userData, isAuthenticated])
 
   // ============================
-  // LOADING AUTH
+  // LOADING AUTH STATE
   // ============================
   if (!isAuthenticated) {
     return (
@@ -114,7 +131,7 @@ export default function HostDashboardPage() {
   }
 
   // ============================
-  // STATS
+  // STATS CALCULATION
   // ============================
   const totalEarnings = transactions
     .filter((t) => t.type === "gift_received")
@@ -122,6 +139,9 @@ export default function HostDashboardPage() {
 
   const pendingWithdrawals = withdrawals.filter((w) => w.status === "pending")
 
+  // ============================
+  // UI RENDER
+  // ============================
   return (
     <div className="min-h-screen bg-background pb-20">
       <div className="container mx-auto px-4 py-6 max-w-4xl">
@@ -144,6 +164,7 @@ export default function HostDashboardPage() {
                 {coinBalance.toLocaleString()}
               </CardTitle>
             </CardHeader>
+
             <CardContent>
               <p className="text-sm text-muted-foreground">
                 ≈ {coinsToPi(coinBalance).toFixed(4)} Pi
@@ -162,7 +183,7 @@ export default function HostDashboardPage() {
             </CardHeader>
           </Card>
 
-          {/* Pending */}
+          {/* Pending Withdrawals */}
           <Card>
             <CardHeader className="pb-3">
               <CardDescription>Pending Withdrawals</CardDescription>
@@ -176,9 +197,7 @@ export default function HostDashboardPage() {
         {/* Actions */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <CreateStreamDialog
-            onStreamCreated={(streamId) =>
-              router.push(`/stream/${streamId}`)
-            }
+            onStreamCreated={(streamId) => router.push(`/stream/${streamId}`)}
           />
 
           <WithdrawalRequestDialog
@@ -194,6 +213,7 @@ export default function HostDashboardPage() {
             <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
           </TabsList>
 
+          {/* Transactions */}
           <TabsContent value="transactions">
             {transactions.length === 0 ? (
               <p className="text-center py-6 text-muted-foreground">
@@ -201,11 +221,14 @@ export default function HostDashboardPage() {
               </p>
             ) : (
               transactions.map((t) => (
-                <p key={t.id}>{t.type}</p>
+                <p key={t.id}>
+                  {t.type} — {t.amount.toLocaleString()} coins
+                </p>
               ))
             )}
           </TabsContent>
 
+          {/* Withdrawals */}
           <TabsContent value="withdrawals">
             {withdrawals.length === 0 ? (
               <p className="text-center py-6 text-muted-foreground">
@@ -213,7 +236,9 @@ export default function HostDashboardPage() {
               </p>
             ) : (
               withdrawals.map((w) => (
-                <p key={w.id}>{w.status}</p>
+                <p key={w.id}>
+                  {w.amount.toLocaleString()} coins — {w.status}
+                </p>
               ))
             )}
           </TabsContent>
