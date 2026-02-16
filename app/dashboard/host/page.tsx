@@ -30,79 +30,71 @@ export default function HostDashboardPage() {
   const { userData, authMessage, isAuthenticated } = usePiAuth()
   const router = useRouter()
 
-  // ============================
-  // STATE
-  // ============================
-  const [coinBalance, setCoinBalance] = useState(0)
+  const [coinBalance, setCoinBalance] = useState<number>(0)
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([])
   const [loading, setLoading] = useState(true)
 
   // ============================
-  // ✅ ROLE GUARD + FETCH DATA
+  // ✅ LOAD HOST DASHBOARD
   // ============================
   useEffect(() => {
     if (!isAuthenticated) return
     if (!userData) return
 
-    // ❌ bukan host → balik ke dashboard biasa
     if (userData.role !== "HOST") {
       router.push("/dashboard")
       return
     }
 
-    fetchDashboardData()
-  }, [isAuthenticated, userData])
+    loadDashboard()
+  }, [userData, isAuthenticated])
 
   // ============================
-  // FETCH DASHBOARD DATA
+  // ✅ FETCH DATA FROM API ONLY
   // ============================
-  const fetchDashboardData = async () => {
-    if (!userData) return
-
+  const loadDashboard = async () => {
     try {
       setLoading(true)
 
-      // ============================
-      // Fetch parallel
-      // ============================
-      const [coinsRes, txRes, wdRes] = await Promise.all([
-        api.get<{ success: boolean; balance: number }>(
-          API_ROUTES.GET_USER_COINS(userData.id)
-        ),
+      // ✅ Coins
+      const coinsRes = await api.get<{
+        success: boolean
+        balance: number
+      }>(API_ROUTES.GET_USER_COINS(userData!.id))
 
-        api.get<{ success: boolean; transactions: Transaction[] }>(
-          API_ROUTES.GET_TRANSACTIONS(userData.id)
-        ),
-
-        api.get<{ success: boolean; withdrawals: Withdrawal[] }>(
-          API_ROUTES.GET_WITHDRAWALS(userData.id)
-        ),
-      ])
-
-      // ============================
-      // Apply results
-      // ============================
       if (coinsRes.data.success) {
         setCoinBalance(coinsRes.data.balance)
       }
 
-      if (txRes.data.success) {
-        setTransactions(txRes.data.transactions)
+      // ✅ Transactions
+      const trxRes = await api.get<{
+        success: boolean
+        transactions: Transaction[]
+      }>(API_ROUTES.GET_TRANSACTIONS(userData!.id))
+
+      if (trxRes.data.success) {
+        setTransactions(trxRes.data.transactions)
       }
+
+      // ✅ Withdrawals
+      const wdRes = await api.get<{
+        success: boolean
+        withdrawals: Withdrawal[]
+      }>(API_ROUTES.GET_WITHDRAWALS(userData!.id))
 
       if (wdRes.data.success) {
         setWithdrawals(wdRes.data.withdrawals)
       }
     } catch (err) {
-      console.error("❌ Host dashboard fetch failed:", err)
+      console.error("❌ Dashboard load error:", err)
     } finally {
       setLoading(false)
     }
   }
 
   // ============================
-  // AUTH LOADING SCREEN
+  // AUTH LOADING
   // ============================
   if (!isAuthenticated) {
     return (
@@ -112,9 +104,6 @@ export default function HostDashboardPage() {
     )
   }
 
-  // ============================
-  // DASHBOARD LOADING
-  // ============================
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -132,14 +121,10 @@ export default function HostDashboardPage() {
 
   const pendingWithdrawals = withdrawals.filter((w) => w.status === "pending")
 
-  // ============================
-  // UI
-  // ============================
   return (
     <div className="min-h-screen bg-background pb-20">
       <div className="container mx-auto px-4 py-6 max-w-4xl">
-
-        {/* HEADER */}
+        {/* Header */}
         <div className="mb-6">
           <h1 className="text-3xl font-bold">Host Dashboard</h1>
           <p className="text-muted-foreground">
@@ -147,10 +132,9 @@ export default function HostDashboardPage() {
           </p>
         </div>
 
-        {/* STATS */}
+        {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-
-          {/* BALANCE */}
+          {/* Coin Balance */}
           <Card>
             <CardHeader className="pb-3">
               <CardDescription>Coin Balance</CardDescription>
@@ -166,7 +150,7 @@ export default function HostDashboardPage() {
             </CardContent>
           </Card>
 
-          {/* EARNINGS */}
+          {/* Earnings */}
           <Card>
             <CardHeader className="pb-3">
               <CardDescription>Total Earnings</CardDescription>
@@ -182,7 +166,7 @@ export default function HostDashboardPage() {
             </CardContent>
           </Card>
 
-          {/* WITHDRAW */}
+          {/* Pending Withdrawals */}
           <Card>
             <CardHeader className="pb-3">
               <CardDescription>Pending Withdrawals</CardDescription>
@@ -198,31 +182,28 @@ export default function HostDashboardPage() {
           </Card>
         </div>
 
-        {/* ACTIONS */}
+        {/* Actions */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-
-          {/* GO LIVE */}
           <CreateStreamDialog
             onStreamCreated={(streamId) =>
               router.push(`/stream/${streamId}/host`)
             }
           />
 
-          {/* WITHDRAW */}
           <WithdrawalRequestDialog
             coinBalance={coinBalance}
-            onSuccess={fetchDashboardData}
+            onSuccess={loadDashboard}
           />
         </div>
 
-        {/* TABS */}
+        {/* Tabs */}
         <Tabs defaultValue="transactions">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="transactions">Transactions</TabsTrigger>
             <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
           </TabsList>
 
-          {/* TRANSACTIONS */}
+          {/* Transactions */}
           <TabsContent value="transactions" className="mt-4 space-y-3">
             {transactions.length === 0 ? (
               <Card>
@@ -251,7 +232,7 @@ export default function HostDashboardPage() {
             )}
           </TabsContent>
 
-          {/* WITHDRAWALS */}
+          {/* Withdrawals */}
           <TabsContent value="withdrawals" className="mt-4 space-y-3">
             {withdrawals.length === 0 ? (
               <Card>
