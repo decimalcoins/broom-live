@@ -35,74 +35,78 @@ export default function HostDashboardPage() {
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([])
   const [loading, setLoading] = useState(true)
 
+  const [error, setError] = useState<string | null>(null)
+
   // ============================
   // FETCH HOST DASHBOARD DATA
   // ============================
   const fetchDashboardData = async () => {
     if (!userData) return
 
-    // ✅ FIX: Always use uid OR id
     const userKey = userData.uid || userData.id
 
     if (!userKey) {
-      console.error("❌ Missing user identifier:", userData)
+      setError("❌ User identifier missing (id/uid not found)")
       return
     }
 
     try {
       setLoading(true)
-
-      console.log("✅ Fetching Host Dashboard for:", userKey)
+      setError(null)
 
       // ============================
       // COIN BALANCE
       // ============================
-      const coinsRes = await api.get(API_ROUTES.GET_USER_COINS(userKey))
+      const coinsUrl = API_ROUTES.GET_USER_COINS(userKey)
 
-      console.log("Coin API Response:", coinsRes.data)
+      console.log("FETCH COINS:", coinsUrl)
 
-      if (coinsRes.data.success) {
-        setCoinBalance(coinsRes.data.balance)
+      const coinsRes = await api.get(coinsUrl)
+
+      if (!coinsRes.data.success) {
+        setError("❌ Coin API failed: " + coinsRes.data.error)
+        return
       }
+
+      setCoinBalance(coinsRes.data.balance)
 
       // ============================
       // TRANSACTIONS
       // ============================
-      const transactionsRes = await api.get(
-        API_ROUTES.GET_TRANSACTIONS(userKey)
-      )
+      const txRes = await api.get(API_ROUTES.GET_TRANSACTIONS(userKey))
 
-      if (transactionsRes.data.success) {
-        setTransactions(transactionsRes.data.transactions)
+      if (txRes.data.success) {
+        setTransactions(txRes.data.transactions)
       }
 
       // ============================
       // WITHDRAWALS
       // ============================
-      const withdrawalsRes = await api.get(
-        API_ROUTES.GET_WITHDRAWALS(userKey)
-      )
+      const wdRes = await api.get(API_ROUTES.GET_WITHDRAWALS(userKey))
 
-      if (withdrawalsRes.data.success) {
-        setWithdrawals(withdrawalsRes.data.withdrawals)
+      if (wdRes.data.success) {
+        setWithdrawals(wdRes.data.withdrawals)
       }
-    } catch (err) {
-      console.error("❌ Failed to fetch host dashboard data:", err)
+    } catch (err: any) {
+      console.error("❌ FETCH ERROR:", err)
+
+      setError(
+        err?.response?.data?.error ||
+          err?.message ||
+          "Unknown fetch error"
+      )
     } finally {
       setLoading(false)
     }
   }
 
   // ============================
-  // ROLE GUARD + INIT FETCH
+  // ROLE GUARD
   // ============================
   useEffect(() => {
     if (!isAuthenticated) return
     if (!userData) return
 
-    console.log("✅ USER DATA FULL:", userData)
-
-    // Only HOST allowed
     if (userData.role !== "HOST") {
       router.push("/dashboard")
       return
@@ -112,7 +116,7 @@ export default function HostDashboardPage() {
   }, [userData, isAuthenticated])
 
   // ============================
-  // LOADING AUTH STATE
+  // AUTH LOADING
   // ============================
   if (!isAuthenticated) {
     return (
@@ -131,7 +135,7 @@ export default function HostDashboardPage() {
   }
 
   // ============================
-  // STATS CALCULATION
+  // STATS
   // ============================
   const totalEarnings = transactions
     .filter((t) => t.type === "gift_received")
@@ -140,7 +144,7 @@ export default function HostDashboardPage() {
   const pendingWithdrawals = withdrawals.filter((w) => w.status === "pending")
 
   // ============================
-  // UI RENDER
+  // UI
   // ============================
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -153,9 +157,28 @@ export default function HostDashboardPage() {
           </p>
         </div>
 
+        {/* DEBUG ERROR */}
+        {error && (
+          <Card className="mb-6 border-red-500">
+            <CardHeader>
+              <CardTitle className="text-red-600">
+                ⚠ Dashboard Error
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-red-500 space-y-2">
+              <p>{error}</p>
+              <p>
+                <b>uid:</b> {userData?.uid || "null"}
+              </p>
+              <p>
+                <b>id:</b> {userData?.id || "null"}
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          {/* Balance */}
           <Card>
             <CardHeader className="pb-3">
               <CardDescription>Coin Balance</CardDescription>
@@ -164,7 +187,6 @@ export default function HostDashboardPage() {
                 {coinBalance.toLocaleString()}
               </CardTitle>
             </CardHeader>
-
             <CardContent>
               <p className="text-sm text-muted-foreground">
                 ≈ {coinsToPi(coinBalance).toFixed(4)} Pi
@@ -172,7 +194,6 @@ export default function HostDashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Earnings */}
           <Card>
             <CardHeader className="pb-3">
               <CardDescription>Total Earnings</CardDescription>
@@ -183,7 +204,6 @@ export default function HostDashboardPage() {
             </CardHeader>
           </Card>
 
-          {/* Pending Withdrawals */}
           <Card>
             <CardHeader className="pb-3">
               <CardDescription>Pending Withdrawals</CardDescription>
@@ -213,33 +233,23 @@ export default function HostDashboardPage() {
             <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
           </TabsList>
 
-          {/* Transactions */}
           <TabsContent value="transactions">
             {transactions.length === 0 ? (
               <p className="text-center py-6 text-muted-foreground">
                 No transactions yet
               </p>
             ) : (
-              transactions.map((t) => (
-                <p key={t.id}>
-                  {t.type} — {t.amount.toLocaleString()} coins
-                </p>
-              ))
+              transactions.map((t) => <p key={t.id}>{t.type}</p>)
             )}
           </TabsContent>
 
-          {/* Withdrawals */}
           <TabsContent value="withdrawals">
             {withdrawals.length === 0 ? (
               <p className="text-center py-6 text-muted-foreground">
                 No withdrawals yet
               </p>
             ) : (
-              withdrawals.map((w) => (
-                <p key={w.id}>
-                  {w.amount.toLocaleString()} coins — {w.status}
-                </p>
-              ))
+              withdrawals.map((w) => <p key={w.id}>{w.status}</p>)
             )}
           </TabsContent>
         </Tabs>
