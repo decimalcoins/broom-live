@@ -6,9 +6,6 @@ export async function POST(req: Request) {
   try {
     const { userId, title, description } = await req.json()
 
-    // ============================
-    // ✅ Validate Input
-    // ============================
     if (!userId) {
       return NextResponse.json(
         { success: false, error: "userId required" },
@@ -16,9 +13,7 @@ export async function POST(req: Request) {
       )
     }
 
-    // ============================
-    // ✅ Load User (include uid!!)
-    // ============================
+    // ✅ Load user lengkap
     const userRes = await db.query(
       `
       SELECT id, uid, username, role
@@ -38,52 +33,34 @@ export async function POST(req: Request) {
       )
     }
 
-    // ============================
-    // ✅ Role Guard (HOST Only)
-    // ============================
-    const role = String(user.role).toUpperCase()
-
-    if (role !== "HOST") {
+    // ✅ Pastikan role HOST
+    if (String(user.role).toUpperCase() !== "HOST") {
       return NextResponse.json(
         { success: false, error: "Only HOST can start live streams" },
         { status: 403 }
       )
     }
 
-    // ============================
-    // ✅ Prevent Multiple Active Streams
-    // ============================
-    const existingLive = await db.query(
+    // ✅ Cegah stream double
+    const existing = await db.query(
       `
-      SELECT id
-      FROM streams
+      SELECT id FROM streams
       WHERE host_id=$1 AND is_live=true
       LIMIT 1
       `,
       [userId]
     )
 
-    if (existingLive.rows.length > 0) {
+    if (existing.rows.length > 0) {
       return NextResponse.json(
         { success: false, error: "You already have an active stream" },
         { status: 400 }
       )
     }
 
-    // ============================
-    // ✅ Create Stream Record
-    // ============================
+    // ✅ Create stream baru
     const streamId = crypto.randomUUID()
 
-    const streamTitle =
-      title?.trim() || `Live Stream by ${user.username}`
-
-    const cleanDescription =
-      description?.trim() || null
-
-    // ============================
-    // ✅ INSERT STREAM WITH host_uid
-    // ============================
     const streamRes = await db.query(
       `
       INSERT INTO streams (
@@ -104,26 +81,22 @@ export async function POST(req: Request) {
       [
         streamId,
         user.id,
-        user.uid, // ✅ THIS IS KEY FIX
+        user.uid,
         user.username,
-        streamTitle,
-        cleanDescription,
+        title?.trim() || `Live Stream by ${user.username}`,
+        description?.trim() || null,
       ]
     )
 
     return NextResponse.json({
       success: true,
-      message: "🎥 Live stream created successfully!",
       stream: streamRes.rows[0],
     })
   } catch (err: any) {
     console.error("❌ STREAM CREATE ERROR:", err)
 
     return NextResponse.json(
-      {
-        success: false,
-        error: err.message || "Stream create failed",
-      },
+      { success: false, error: err.message },
       { status: 500 }
     )
   }
