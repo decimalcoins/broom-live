@@ -14,32 +14,26 @@ export default function StreamPage({
 }: {
   params: { id: string }
 }) {
-  const { id } = params
+  const id = params.id
 
   const [stream, setStream] = useState<Stream | null>(null)
   const [loading, setLoading] = useState(true)
 
-  // ============================
-  // ✅ Fetch Stream Detail
-  // ============================
   useEffect(() => {
-    if (!id) return
-
     const fetchStream = async () => {
       try {
         setLoading(true)
 
-        const response = await api.get<{
-          success: boolean
-          stream: Stream
-        }>(API_ROUTES.GET_STREAM(id))
+        const res = await api.get(API_ROUTES.GET_STREAM(id))
 
-        if (!response.data.success) {
+        console.log("STREAM DETAIL:", res.data)
+
+        if (!res.data.success) {
           setStream(null)
           return
         }
 
-        setStream(response.data.stream)
+        setStream(res.data.stream)
       } catch (err) {
         console.error("❌ Failed to fetch stream:", err)
         setStream(null)
@@ -51,16 +45,10 @@ export default function StreamPage({
     fetchStream()
   }, [id])
 
-  // ============================
-  // Splash Screen While Loading
-  // ============================
   if (loading) {
     return <StreamSplash label="Joining Stream..." />
   }
 
-  // ============================
-  // Stream Not Found
-  // ============================
   if (!stream) {
     return (
       <div className="flex items-center justify-center h-screen bg-black text-white">
@@ -69,12 +57,5 @@ export default function StreamPage({
     )
   }
 
-  // ============================
-  // Main Stream Viewer Page
-  // ============================
-  return (
-    <StreamSplash label="Loading Live Room...">
-      <StreamWithChat stream={stream} />
-    </StreamSplash>
-  )
+  return <StreamWithChat stream={stream} />
 }

@@ -36,16 +36,8 @@ export function CreateStreamDialog({
   const [creating, setCreating] = useState(false)
 
   const handleCreate = async () => {
-    if (!userData) {
+    if (!userData?.id) {
       alert("❌ User not logged in")
-      return
-    }
-
-    // ✅ FIX: Support id OR uid
-    const userKey = userData.id || userData.uid
-
-    if (!userKey) {
-      alert("❌ User identifier missing (id/uid)")
       return
     }
 
@@ -58,32 +50,39 @@ export function CreateStreamDialog({
 
     try {
       const res = await api.post(API_ROUTES.CREATE_STREAM, {
-        userId: userKey,
+        userId: userData.id,
         title: title.trim(),
         description: description.trim(),
       })
 
-      if (!res.data.success) {
-        alert("❌ " + (res.data.error || "Stream create failed"))
+      console.log("STREAM CREATE RESPONSE:", res.data)
+
+      if (!res.data?.success) {
+        alert("❌ " + (res.data?.error || "Stream create failed"))
+        return
+      }
+
+      if (!res.data.stream?.id) {
+        alert("❌ Stream created but ID missing!")
         return
       }
 
       const streamId = res.data.stream.id
 
-      alert("✅ Stream created!")
-
-      onStreamCreated(streamId)
+      alert("✅ Stream Created!")
 
       setOpen(false)
       setTitle("")
       setDescription("")
+
+      onStreamCreated(streamId)
     } catch (err: any) {
       console.error("❌ STREAM CREATE ERROR:", err)
 
       alert(
         "❌ Failed to create stream:\n" +
           (err?.response?.data?.error ||
-            err.message ||
+            err?.message ||
             "Unknown error")
       )
     } finally {
