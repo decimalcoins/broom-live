@@ -2,21 +2,23 @@ import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
 
 export async function GET(
-  request: Request,
-  context: { params: { id: string } }
+  req: Request,
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const userId = context.params.id
+    // ✅ FIX: params harus di-await
+    const { id } = await context.params
 
-    console.log("✅ COIN API HIT:", userId)
-
-    if (!userId) {
+    if (!id) {
       return NextResponse.json(
         { success: false, error: "User ID required" },
         { status: 400 }
       )
     }
 
+    // ============================
+    // ✅ Support id atau uid
+    // ============================
     const res = await db.query(
       `
       SELECT id, uid, username, coin_balance
@@ -24,7 +26,7 @@ export async function GET(
       WHERE id=$1 OR uid=$1
       LIMIT 1
       `,
-      [userId]
+      [id]
     )
 
     if (res.rows.length === 0) {
