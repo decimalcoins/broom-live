@@ -12,6 +12,9 @@ export interface ApiError<T = unknown> extends Error {
 
 let authToken: string | null = null
 
+// ✅ BASE URL FIX
+const API_BASE = process.env.NEXT_PUBLIC_APP_URL || ""
+
 const request = async <T = any>(
   url: string,
   init: RequestInit = {}
@@ -20,7 +23,6 @@ const request = async <T = any>(
     ...(init.headers as Record<string, string> | undefined),
   }
 
-  // ✅ Only attach JSON header when body exists
   if (init.body) {
     headers["Content-Type"] = "application/json"
   }
@@ -29,8 +31,10 @@ const request = async <T = any>(
     headers["Authorization"] = authToken
   }
 
-  // ✅ FIX: Always include cookies/session
-  const response = await fetch(url, {
+  // ✅ ALWAYS USE ABSOLUTE URL
+  const fullUrl = `${API_BASE}${url}`
+
+  const response = await fetch(fullUrl, {
     ...init,
     headers,
     credentials: "include",
