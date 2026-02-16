@@ -5,12 +5,13 @@ import { db } from "@/lib/db"
 
 export async function GET(
   req: Request,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const streamId = params.id
+    // ✅ FIX: params must be awaited
+    const { id } = await context.params
 
-    if (!streamId) {
+    if (!id) {
       return NextResponse.json(
         { success: false, error: "Stream ID required" },
         { status: 400 }
@@ -24,7 +25,7 @@ export async function GET(
       WHERE id=$1
       LIMIT 1
       `,
-      [streamId]
+      [id]
     )
 
     if (res.rows.length === 0) {
