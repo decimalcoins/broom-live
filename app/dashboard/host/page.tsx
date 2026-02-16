@@ -43,57 +43,59 @@ export default function HostDashboardPage() {
   const fetchDashboardData = async () => {
     if (!userData) return
 
-    const userKey = userData.uid || userData.id
-
-    if (!userKey) {
-      setError("❌ User identifier missing (id/uid not found)")
-      return
-    }
+    const userKey = userData.id
 
     try {
       setLoading(true)
       setError(null)
 
       // ============================
-      // COIN BALANCE
+      // ✅ COIN BALANCE
       // ============================
-      const coinsUrl = API_ROUTES.GET_USER_COINS(userKey)
+      const coinsRes = await api.get(
+        API_ROUTES.GET_USER_COINS(userKey)
+      )
 
-      console.log("FETCH COINS:", coinsUrl)
-
-      const coinsRes = await api.get(coinsUrl)
-
-      if (!coinsRes.data.success) {
-        setError("❌ Coin API failed: " + coinsRes.data.error)
-        return
-      }
-
-      setCoinBalance(coinsRes.data.balance)
-
-      // ============================
-      // TRANSACTIONS
-      // ============================
-      const txRes = await api.get(API_ROUTES.GET_TRANSACTIONS(userKey))
-
-      if (txRes.data.success) {
-        setTransactions(txRes.data.transactions)
+      if (coinsRes.data.success) {
+        setCoinBalance(coinsRes.data.balance)
       }
 
       // ============================
-      // WITHDRAWALS
+      // ✅ TRANSACTIONS (optional)
       // ============================
-      const wdRes = await api.get(API_ROUTES.GET_WITHDRAWALS(userKey))
+      try {
+        const txRes = await api.get(
+          API_ROUTES.GET_TRANSACTIONS(userKey)
+        )
 
-      if (wdRes.data.success) {
-        setWithdrawals(wdRes.data.withdrawals)
+        if (txRes.data.success) {
+          setTransactions(txRes.data.transactions || [])
+        }
+      } catch (txErr) {
+        console.warn("Transactions failed (ignored)")
+      }
+
+      // ============================
+      // ✅ WITHDRAWALS (optional)
+      // ============================
+      try {
+        const wdRes = await api.get(
+          API_ROUTES.GET_WITHDRAWALS(userKey)
+        )
+
+        if (wdRes.data.success) {
+          setWithdrawals(wdRes.data.withdrawals || [])
+        }
+      } catch (wdErr) {
+        console.warn("Withdrawals failed (ignored)")
       }
     } catch (err: any) {
-      console.error("❌ FETCH ERROR:", err)
+      console.error("❌ HOST DASHBOARD ERROR:", err)
 
       setError(
-        err?.response?.data?.error ||
+        err?.data?.error ||
           err?.message ||
-          "Unknown fetch error"
+          "Request failed"
       )
     } finally {
       setLoading(false)
@@ -141,7 +143,9 @@ export default function HostDashboardPage() {
     .filter((t) => t.type === "gift_received")
     .reduce((sum, t) => sum + t.amount, 0)
 
-  const pendingWithdrawals = withdrawals.filter((w) => w.status === "pending")
+  const pendingWithdrawals = withdrawals.filter(
+    (w) => w.status === "pending"
+  )
 
   // ============================
   // UI
@@ -149,7 +153,6 @@ export default function HostDashboardPage() {
   return (
     <div className="min-h-screen bg-background pb-20">
       <div className="container mx-auto px-4 py-6 max-w-4xl">
-        {/* Header */}
         <div className="mb-6">
           <h1 className="text-3xl font-bold">Host Dashboard</h1>
           <p className="text-muted-foreground">
@@ -157,7 +160,7 @@ export default function HostDashboardPage() {
           </p>
         </div>
 
-        {/* DEBUG ERROR */}
+        {/* ERROR BOX */}
         {error && (
           <Card className="mb-6 border-red-500">
             <CardHeader>
@@ -165,19 +168,13 @@ export default function HostDashboardPage() {
                 ⚠ Dashboard Error
               </CardTitle>
             </CardHeader>
-            <CardContent className="text-sm text-red-500 space-y-2">
-              <p>{error}</p>
-              <p>
-                <b>uid:</b> {userData?.uid || "null"}
-              </p>
-              <p>
-                <b>id:</b> {userData?.id || "null"}
-              </p>
+            <CardContent className="text-sm text-red-500">
+              {error}
             </CardContent>
           </Card>
         )}
 
-        {/* Stats */}
+        {/* STATS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <Card>
             <CardHeader className="pb-3">
@@ -214,10 +211,12 @@ export default function HostDashboardPage() {
           </Card>
         </div>
 
-        {/* Actions */}
+        {/* ACTIONS */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <CreateStreamDialog
-            onStreamCreated={(streamId) => router.push(`/stream/${streamId}`)}
+            onStreamCreated={(streamId) =>
+              router.push(`/stream/${streamId}`)
+            }
           />
 
           <WithdrawalRequestDialog
@@ -226,11 +225,15 @@ export default function HostDashboardPage() {
           />
         </div>
 
-        {/* Tabs */}
+        {/* TABS */}
         <Tabs defaultValue="transactions">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="transactions">Transactions</TabsTrigger>
-            <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
+            <TabsTrigger value="transactions">
+              Transactions
+            </TabsTrigger>
+            <TabsTrigger value="withdrawals">
+              Withdrawals
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="transactions">
@@ -239,7 +242,9 @@ export default function HostDashboardPage() {
                 No transactions yet
               </p>
             ) : (
-              transactions.map((t) => <p key={t.id}>{t.type}</p>)
+              transactions.map((t) => (
+                <p key={t.id}>{t.type}</p>
+              ))
             )}
           </TabsContent>
 
@@ -249,7 +254,9 @@ export default function HostDashboardPage() {
                 No withdrawals yet
               </p>
             ) : (
-              withdrawals.map((w) => <p key={w.id}>{w.status}</p>)
+              withdrawals.map((w) => (
+                <p key={w.id}>{w.status}</p>
+              ))
             )}
           </TabsContent>
         </Tabs>
