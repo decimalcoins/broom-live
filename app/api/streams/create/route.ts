@@ -13,9 +13,7 @@ export async function POST(req: Request) {
       )
     }
 
-    // ============================
-    // ✅ FIX: Support ID OR UID
-    // ============================
+    // ✅ Find user by ID or UID
     const userRes = await db.query(
       `
       SELECT id, uid, username, role
@@ -26,18 +24,16 @@ export async function POST(req: Request) {
       [userId]
     )
 
-    const user = userRes.rows[0]
-
-    if (!user) {
+    if (userRes.rows.length === 0) {
       return NextResponse.json(
         { success: false, error: "User not found" },
         { status: 404 }
       )
     }
 
-    // ============================
-    // ✅ Role Guard
-    // ============================
+    const user = userRes.rows[0]
+
+    // ✅ Only HOST can start
     if (String(user.role).toUpperCase() !== "HOST") {
       return NextResponse.json(
         { success: false, error: "Only HOST can start streams" },
@@ -45,9 +41,7 @@ export async function POST(req: Request) {
       )
     }
 
-    // ============================
-    // ✅ Prevent multiple live streams
-    // ============================
+    // ✅ Prevent multiple live
     const existing = await db.query(
       `
       SELECT id FROM streams
@@ -57,19 +51,18 @@ export async function POST(req: Request) {
       [user.id]
     )
 
+    // ✅ If already live → return same streamId
     if (existing.rows.length > 0) {
-      return NextResponse.json(
-        { success: false, error: "Stream already active" },
-        { status: 400 }
-      )
+      return NextResponse.json({
+        success: true,
+        streamId: existing.rows[0].id,
+      })
     }
 
-    // ============================
-    // ✅ Create Stream
-    // ============================
+    // ✅ Create new stream
     const streamId = crypto.randomUUID()
 
-    const streamRes = await db.query(
+    await db.query(
       `
       INSERT INTO streams (
         id,
@@ -84,7 +77,6 @@ export async function POST(req: Request) {
         created_at
       )
       VALUES ($1,$2,$3,$4,$5,$6,true,0,NOW(),NOW())
-      RETURNING *
       `,
       [
         streamId,
@@ -96,18 +88,16 @@ export async function POST(req: Request) {
       ]
     )
 
+    // ✅ IMPORTANT: return streamId only
     return NextResponse.json({
       success: true,
-      stream: streamRes.rows[0],
+      streamId,
     })
   } catch (err: any) {
     console.error("❌ CREATE STREAM ERROR:", err)
 
     return NextResponse.json(
-      {
-        success: false,
-        error: err.message || "Failed to create stream",
-      },
+      { success: false, error: "Failed to create stream" },
       { status: 500 }
     )
   }
