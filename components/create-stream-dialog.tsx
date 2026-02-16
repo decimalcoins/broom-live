@@ -15,6 +15,7 @@ import { Button } from "./ui/button"
 import { Input } from "./ui/input"
 import { Textarea } from "./ui/textarea"
 import { Label } from "./ui/label"
+
 import { Video } from "lucide-react"
 
 import { api } from "@/lib/api"
@@ -24,7 +25,9 @@ interface CreateStreamDialogProps {
   onStreamCreated: (streamId: string) => void
 }
 
-export function CreateStreamDialog({ onStreamCreated }: CreateStreamDialogProps) {
+export function CreateStreamDialog({
+  onStreamCreated,
+}: CreateStreamDialogProps) {
   const { userData } = usePiAuth()
 
   const [open, setOpen] = useState(false)
@@ -33,8 +36,15 @@ export function CreateStreamDialog({ onStreamCreated }: CreateStreamDialogProps)
   const [creating, setCreating] = useState(false)
 
   const handleCreate = async () => {
-    if (!userData) return alert("User not logged in")
-    if (!title.trim()) return alert("Title required")
+    if (!userData) {
+      alert("❌ User not logged in")
+      return
+    }
+
+    if (!title.trim()) {
+      alert("❌ Title required")
+      return
+    }
 
     setCreating(true)
 
@@ -45,22 +55,29 @@ export function CreateStreamDialog({ onStreamCreated }: CreateStreamDialogProps)
         description: description.trim(),
       })
 
+      // ✅ Backend error message
       if (!res.data.success) {
-        return alert(res.data.error || "Failed to create stream")
+        alert("❌ " + (res.data.error || "Stream create failed"))
+        return
       }
 
-      // ✅ FIX: ambil stream.id
       const streamId = res.data.stream.id
 
-      // ✅ redirect / open stream
+      alert("✅ Stream created!")
+
       onStreamCreated(streamId)
 
       setOpen(false)
       setTitle("")
       setDescription("")
-    } catch (err) {
-      console.error("❌ Failed create stream:", err)
-      alert("Failed to create stream")
+    } catch (err: any) {
+      console.error("❌ STREAM CREATE ERROR:", err)
+
+      // ✅ tampilkan error asli
+      alert(
+        "❌ Failed to create stream:\n" +
+          (err?.data?.error || err.message || "Unknown error")
+      )
     } finally {
       setCreating(false)
     }
@@ -103,7 +120,11 @@ export function CreateStreamDialog({ onStreamCreated }: CreateStreamDialogProps)
             />
           </div>
 
-          <Button className="w-full" disabled={creating} onClick={handleCreate}>
+          <Button
+            className="w-full"
+            disabled={creating}
+            onClick={handleCreate}
+          >
             {creating ? "Creating..." : "Start Stream"}
           </Button>
         </div>
