@@ -29,18 +29,42 @@ export function HostStreamView({ streamId, onEndStream }: HostStreamViewProps) {
 
   const [giftEvent, setGiftEvent] = useState<any>(null)
 
+  // ✅ stream room_name dari DB
+  const [roomName, setRoomName] = useState<string | null>(null)
+
+  // ✅ token LiveKit
   const [token, setToken] = useState<string | null>(null)
   const [loadingToken, setLoadingToken] = useState(true)
   const [tokenError, setTokenError] = useState<string | null>(null)
 
-  // ===============================
-  // ✅ ROOM NAME MUST MATCH VIEWER
-  // ===============================
-  const roomName = userData?.uid ? `broom_${userData.uid}` : null
+  // ======================================================
+  // ✅ STEP 1: FETCH STREAM DETAIL → ambil room_name
+  // ======================================================
+  useEffect(() => {
+    const fetchStream = async () => {
+      try {
+        const res = await fetch(`/api/streams/${streamId}`)
+        const data = await res.json()
 
-  // ===============================
-  // ✅ LIVEKIT HOOK (HOST ROLE FIX)
-  // ===============================
+        console.log("🎥 STREAM DETAIL:", data)
+
+        if (!data.success || !data.stream?.room_name) {
+          throw new Error("room_name not found in stream")
+        }
+
+        setRoomName(data.stream.room_name)
+      } catch (err: any) {
+        console.error("❌ Failed to fetch stream room:", err)
+        setTokenError(err.message)
+      }
+    }
+
+    fetchStream()
+  }, [streamId])
+
+  // ======================================================
+  // ✅ STEP 2: LIVEKIT HOOK (HOST ROLE)
+  // ======================================================
   const {
     room,
     isConnected,
@@ -52,9 +76,9 @@ export function HostStreamView({ streamId, onEndStream }: HostStreamViewProps) {
     toggleMic,
   } = useLiveKit(roomName, token, "host")
 
-  // ===============================
-  // ✅ FETCH HOST TOKEN
-  // ===============================
+  // ======================================================
+  // ✅ STEP 3: FETCH HOST TOKEN
+  // ======================================================
   useEffect(() => {
     if (!roomName || !userData?.username) return
 
@@ -81,7 +105,7 @@ export function HostStreamView({ streamId, onEndStream }: HostStreamViewProps) {
 
         setToken(data.token)
       } catch (err: any) {
-        console.error("Host Token Error:", err)
+        console.error("❌ Host Token Error:", err)
         setTokenError(err.message)
       } finally {
         setLoadingToken(false)
@@ -91,9 +115,9 @@ export function HostStreamView({ streamId, onEndStream }: HostStreamViewProps) {
     fetchToken()
   }, [roomName, userData?.username])
 
-  // ===============================
-  // ✅ CONNECT WHEN TOKEN READY
-  // ===============================
+  // ======================================================
+  // ✅ STEP 4: CONNECT WHEN TOKEN READY
+  // ======================================================
   useEffect(() => {
     if (!token) return
 
@@ -102,9 +126,9 @@ export function HostStreamView({ streamId, onEndStream }: HostStreamViewProps) {
     return () => disconnect()
   }, [token, connect, disconnect])
 
-  // ===============================
-  // ✅ LISTEN GIFTS REALTIME
-  // ===============================
+  // ======================================================
+  // ✅ STEP 5: LISTEN GIFTS REALTIME
+  // ======================================================
   useEffect(() => {
     if (!room) return
 
@@ -129,9 +153,9 @@ export function HostStreamView({ streamId, onEndStream }: HostStreamViewProps) {
     return () => room.off("dataReceived", handleData)
   }, [room, addCoins])
 
-  // ===============================
-  // ✅ END STREAM
-  // ===============================
+  // ======================================================
+  // ✅ STEP 6: END STREAM
+  // ======================================================
   const handleEndStream = async () => {
     if (!room || !userData) return
 
@@ -156,16 +180,16 @@ export function HostStreamView({ streamId, onEndStream }: HostStreamViewProps) {
         }),
       })
     } catch (err) {
-      console.error("End stream failed:", err)
+      console.error("❌ End stream failed:", err)
     }
 
     disconnect()
     onEndStream()
   }
 
-  // ===============================
+  // ======================================================
   // UI STATES
-  // ===============================
+  // ======================================================
   if (loadingToken) {
     return (
       <div className="h-screen flex items-center justify-center bg-black text-white">
@@ -190,16 +214,16 @@ export function HostStreamView({ streamId, onEndStream }: HostStreamViewProps) {
     )
   }
 
-  // ===============================
-  // ✅ LOCAL CAMERA TRACK PUBLICATION
-  // ===============================
+  // ======================================================
+  // ✅ LOCAL CAMERA TRACK
+  // ======================================================
   const publication = room.localParticipant.getTrackPublication(
     Track.Source.Camera
   )
 
-  // ===============================
+  // ======================================================
   // MAIN HOST UI
-  // ===============================
+  // ======================================================
   return (
     <LiveKitProvider room={room}>
       <div className="flex flex-col h-screen bg-black relative">
