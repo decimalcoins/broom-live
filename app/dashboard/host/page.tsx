@@ -36,7 +36,7 @@ export default function HostDashboardPage() {
   const [loading, setLoading] = useState(true)
 
   // ============================
-  // ✅ FETCH DASHBOARD
+  // FETCH HOST DASHBOARD DATA
   // ============================
   const fetchDashboardData = async () => {
     if (!userData) return
@@ -44,44 +44,43 @@ export default function HostDashboardPage() {
     try {
       setLoading(true)
 
-      // ✅ Coins API
-      const coinsRes = await api.get<{
-        success: boolean
-        balance: number
-      }>(API_ROUTES.GET_USER_COINS(userData.id))
+      // ✅ DEBUG LOG
+      console.log("Fetching coin balance for:", userData.id)
+
+      const coinsRes = await api.get(
+        API_ROUTES.GET_USER_COINS(userData.id)
+      )
+
+      console.log("Coin API Response:", coinsRes.data)
 
       if (coinsRes.data.success) {
         setCoinBalance(coinsRes.data.balance)
       }
 
-      // ✅ Transactions API
-      const txRes = await api.get<{
-        success: boolean
-        transactions: Transaction[]
-      }>(API_ROUTES.GET_TRANSACTIONS(userData.id))
+      const transactionsRes = await api.get(
+        API_ROUTES.GET_TRANSACTIONS(userData.id)
+      )
 
-      if (txRes.data.success) {
-        setTransactions(txRes.data.transactions)
+      if (transactionsRes.data.success) {
+        setTransactions(transactionsRes.data.transactions)
       }
 
-      // ✅ Withdrawals API
-      const wdRes = await api.get<{
-        success: boolean
-        withdrawals: Withdrawal[]
-      }>(API_ROUTES.GET_WITHDRAWALS(userData.id))
+      const withdrawalsRes = await api.get(
+        API_ROUTES.GET_WITHDRAWALS(userData.id)
+      )
 
-      if (wdRes.data.success) {
-        setWithdrawals(wdRes.data.withdrawals)
+      if (withdrawalsRes.data.success) {
+        setWithdrawals(withdrawalsRes.data.withdrawals)
       }
     } catch (err) {
-      console.error("❌ Host dashboard error:", err)
+      console.error("❌ Failed to fetch dashboard data:", err)
     } finally {
       setLoading(false)
     }
   }
 
   // ============================
-  // ✅ ROLE GUARD
+  // ROLE GUARD
   // ============================
   useEffect(() => {
     if (!isAuthenticated) return
@@ -96,7 +95,7 @@ export default function HostDashboardPage() {
   }, [userData, isAuthenticated])
 
   // ============================
-  // UI STATES
+  // LOADING AUTH
   // ============================
   if (!isAuthenticated) {
     return (
@@ -126,57 +125,60 @@ export default function HostDashboardPage() {
   return (
     <div className="min-h-screen bg-background pb-20">
       <div className="container mx-auto px-4 py-6 max-w-4xl">
-
-        <h1 className="text-3xl font-bold mb-2">Host Dashboard</h1>
-        <p className="text-muted-foreground mb-6">
-          Manage your streams and earnings
-        </p>
+        {/* Header */}
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold">Host Dashboard</h1>
+          <p className="text-muted-foreground">
+            Manage your streams and earnings
+          </p>
+        </div>
 
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-
           {/* Balance */}
           <Card>
-            <CardHeader>
+            <CardHeader className="pb-3">
               <CardDescription>Coin Balance</CardDescription>
-              <CardTitle className="text-3xl flex gap-2 items-center">
+              <CardTitle className="text-3xl flex items-center gap-2">
                 <Coins className="w-6 h-6" />
                 {coinBalance.toLocaleString()}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              ≈ {coinsToPi(coinBalance).toFixed(4)} Pi
+              <p className="text-sm text-muted-foreground">
+                ≈ {coinsToPi(coinBalance).toFixed(4)} Pi
+              </p>
             </CardContent>
           </Card>
 
           {/* Earnings */}
           <Card>
-            <CardHeader>
+            <CardHeader className="pb-3">
               <CardDescription>Total Earnings</CardDescription>
-              <CardTitle className="text-3xl flex gap-2 items-center">
+              <CardTitle className="text-3xl flex items-center gap-2">
                 <TrendingUp className="w-6 h-6" />
                 {totalEarnings.toLocaleString()}
               </CardTitle>
             </CardHeader>
-            <CardContent>Coins earned from gifts</CardContent>
           </Card>
 
           {/* Pending */}
           <Card>
-            <CardHeader>
+            <CardHeader className="pb-3">
               <CardDescription>Pending Withdrawals</CardDescription>
               <CardTitle className="text-3xl">
                 {pendingWithdrawals.length}
               </CardTitle>
             </CardHeader>
-            <CardContent>Awaiting approval</CardContent>
           </Card>
         </div>
 
         {/* Actions */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <CreateStreamDialog
-            onStreamCreated={(id) => router.push(`/stream/${id}/host`)}
+            onStreamCreated={(streamId) =>
+              router.push(`/stream/${streamId}`)
+            }
           />
 
           <WithdrawalRequestDialog
@@ -184,6 +186,38 @@ export default function HostDashboardPage() {
             onSuccess={fetchDashboardData}
           />
         </div>
+
+        {/* Tabs */}
+        <Tabs defaultValue="transactions">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="transactions">Transactions</TabsTrigger>
+            <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="transactions">
+            {transactions.length === 0 ? (
+              <p className="text-center py-6 text-muted-foreground">
+                No transactions yet
+              </p>
+            ) : (
+              transactions.map((t) => (
+                <p key={t.id}>{t.type}</p>
+              ))
+            )}
+          </TabsContent>
+
+          <TabsContent value="withdrawals">
+            {withdrawals.length === 0 ? (
+              <p className="text-center py-6 text-muted-foreground">
+                No withdrawals yet
+              </p>
+            ) : (
+              withdrawals.map((w) => (
+                <p key={w.id}>{w.status}</p>
+              ))
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   )
