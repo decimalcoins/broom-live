@@ -3,22 +3,22 @@ import { db } from "@/lib/db"
 
 export async function GET(
   req: Request,
-  context: { params: Promise<{ id: string }> }
+  context: { params: { id: string } }
 ) {
   try {
-    // ✅ FIX: params harus di-await
-    const { id } = await context.params
+    // ✅ FIX: params must come from context
+    const userId = context.params.id
 
-    if (!id) {
+    console.log("✅ COIN API HIT:", userId)
+
+    if (!userId) {
       return NextResponse.json(
         { success: false, error: "User ID required" },
         { status: 400 }
       )
     }
 
-    // ============================
-    // ✅ Support id atau uid
-    // ============================
+    // ✅ Support ID or UID
     const res = await db.query(
       `
       SELECT id, uid, username, coin_balance
@@ -26,7 +26,7 @@ export async function GET(
       WHERE id=$1 OR uid=$1
       LIMIT 1
       `,
-      [id]
+      [userId]
     )
 
     if (res.rows.length === 0) {
