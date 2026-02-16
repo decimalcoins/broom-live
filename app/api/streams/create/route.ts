@@ -13,12 +13,14 @@ export async function POST(req: Request) {
       )
     }
 
-    // ✅ Load User with UID
+    // ============================
+    // ✅ FIX: Support ID OR UID
+    // ============================
     const userRes = await db.query(
       `
       SELECT id, uid, username, role
       FROM users
-      WHERE id=$1
+      WHERE id=$1 OR uid=$1
       LIMIT 1
       `,
       [userId]
@@ -33,7 +35,9 @@ export async function POST(req: Request) {
       )
     }
 
+    // ============================
     // ✅ Role Guard
+    // ============================
     if (String(user.role).toUpperCase() !== "HOST") {
       return NextResponse.json(
         { success: false, error: "Only HOST can start streams" },
@@ -41,14 +45,16 @@ export async function POST(req: Request) {
       )
     }
 
-    // ✅ Prevent multiple live
+    // ============================
+    // ✅ Prevent multiple live streams
+    // ============================
     const existing = await db.query(
       `
       SELECT id FROM streams
       WHERE host_id=$1 AND is_live=true
       LIMIT 1
       `,
-      [userId]
+      [user.id]
     )
 
     if (existing.rows.length > 0) {
@@ -58,7 +64,9 @@ export async function POST(req: Request) {
       )
     }
 
+    // ============================
     // ✅ Create Stream
+    // ============================
     const streamId = crypto.randomUUID()
 
     const streamRes = await db.query(
@@ -83,8 +91,8 @@ export async function POST(req: Request) {
         user.id,
         user.uid,
         user.username,
-        title || `Live by ${user.username}`,
-        description || null,
+        title?.trim() || `Live by ${user.username}`,
+        description?.trim() || null,
       ]
     )
 
@@ -98,7 +106,7 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         success: false,
-        error: err.message,
+        error: err.message || "Failed to create stream",
       },
       { status: 500 }
     )
