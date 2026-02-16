@@ -13,7 +13,7 @@ export async function POST(req: Request) {
       )
     }
 
-    // ✅ Load user lengkap
+    // ✅ Load User with UID
     const userRes = await db.query(
       `
       SELECT id, uid, username, role
@@ -33,15 +33,15 @@ export async function POST(req: Request) {
       )
     }
 
-    // ✅ Pastikan role HOST
+    // ✅ Role Guard
     if (String(user.role).toUpperCase() !== "HOST") {
       return NextResponse.json(
-        { success: false, error: "Only HOST can start live streams" },
+        { success: false, error: "Only HOST can start streams" },
         { status: 403 }
       )
     }
 
-    // ✅ Cegah stream double
+    // ✅ Prevent multiple live
     const existing = await db.query(
       `
       SELECT id FROM streams
@@ -53,12 +53,12 @@ export async function POST(req: Request) {
 
     if (existing.rows.length > 0) {
       return NextResponse.json(
-        { success: false, error: "You already have an active stream" },
+        { success: false, error: "Stream already active" },
         { status: 400 }
       )
     }
 
-    // ✅ Create stream baru
+    // ✅ Create Stream
     const streamId = crypto.randomUUID()
 
     const streamRes = await db.query(
@@ -83,8 +83,8 @@ export async function POST(req: Request) {
         user.id,
         user.uid,
         user.username,
-        title?.trim() || `Live Stream by ${user.username}`,
-        description?.trim() || null,
+        title || `Live by ${user.username}`,
+        description || null,
       ]
     )
 
@@ -93,10 +93,13 @@ export async function POST(req: Request) {
       stream: streamRes.rows[0],
     })
   } catch (err: any) {
-    console.error("❌ STREAM CREATE ERROR:", err)
+    console.error("❌ CREATE STREAM ERROR:", err)
 
     return NextResponse.json(
-      { success: false, error: err.message },
+      {
+        success: false,
+        error: err.message,
+      },
       { status: 500 }
     )
   }
