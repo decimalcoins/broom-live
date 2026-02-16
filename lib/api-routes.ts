@@ -9,18 +9,18 @@ export const API_ROUTES = {
   // USERS
   // ============================
 
-  // ✅ Get user profile
+  // ✅ User Profile
   GET_USER: (id: string) => `/api/users/${id}`,
 
-  // ✅ FINAL FIX: Coin balance endpoint (sesuai struktur project kamu)
-  // Folder asli:
+  // ✅ Coin Balance (sesuai folder kamu)
   // app/api/user/[id]/coin/route.ts
   GET_USER_COINS: (id: string) => `/api/user/${id}/coin`,
 
-  // ✅ Transactions history
-  GET_TRANSACTIONS: (id: string) => `/api/users/${id}/transactions`,
+  // ✅ Transactions
+  GET_TRANSACTIONS: (id: string) =>
+    `/api/users/${id}/transactions`,
 
-  // ✅ Current logged user (Pi Auth)
+  // ✅ Current logged user
   GET_ME: `/api/user/me`,
 
   // ============================
@@ -38,8 +38,8 @@ export const API_ROUTES = {
 
   LIVE_STREAMS: `/api/streams/live`,
 
-  // ✅ Viewer token per stream
-  VIEWER_TOKEN: (id: string) => `/api/streams/${id}/viewer-token`,
+  VIEWER_TOKEN: (id: string) =>
+    `/api/streams/${id}/viewer-token`,
 
   // ============================
   // GIFTS
@@ -48,13 +48,13 @@ export const API_ROUTES = {
   SEND_GIFT: `/api/gifts/send`,
 
   // ============================
-  // LIVEKIT TOKEN
+  // LIVEKIT
   // ============================
 
   LIVEKIT_TOKEN: `/api/livekit/token`,
 
   // ============================
-  // PAYMENTS (Pi)
+  // PAYMENTS
   // ============================
 
   PAYMENT_APPROVE: `/api/payments/approve`,
@@ -64,7 +64,8 @@ export const API_ROUTES = {
   // WITHDRAWALS
   // ============================
 
-  GET_WITHDRAWALS: (hostId: string) => `/api/withdrawals/host/${hostId}`,
+  GET_WITHDRAWALS: (hostId: string) =>
+    `/api/withdrawals/host/${hostId}`,
 
   REQUEST_WITHDRAWAL: `/api/withdrawals/request`,
 
