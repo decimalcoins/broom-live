@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic"
+
 import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
 
@@ -8,25 +10,18 @@ export async function GET(
   try {
     const streamId = params.id
 
-    // ============================
-    // ✅ Fetch Stream Detail
-    // ============================
+    if (!streamId) {
+      return NextResponse.json(
+        { success: false, error: "Stream ID required" },
+        { status: 400 }
+      )
+    }
+
     const res = await db.query(
       `
-      SELECT
-        id,
-        host_id,
-        host_uid,          -- ✅ IMPORTANT FIX
-        host_username,
-        title,
-        description,
-        thumbnail_url,
-        is_live,
-        viewer_count,
-        started_at,
-        ended_at
+      SELECT *
       FROM streams
-      WHERE id = $1
+      WHERE id=$1
       LIMIT 1
       `,
       [streamId]
@@ -43,11 +38,14 @@ export async function GET(
       success: true,
       stream: res.rows[0],
     })
-  } catch (err) {
+  } catch (err: any) {
     console.error("❌ STREAM DETAIL ERROR:", err)
 
     return NextResponse.json(
-      { success: false, error: "Failed to fetch stream detail" },
+      {
+        success: false,
+        error: err.message || "Failed to fetch stream",
+      },
       { status: 500 }
     )
   }
