@@ -1,89 +1,78 @@
 import { NextResponse } from "next/server"
 import { AccessToken } from "livekit-server-sdk"
 
+export const dynamic = "force-dynamic"
+
 export async function POST(req: Request) {
   try {
-    const body = await req.json()
+    let body: any
 
-    const roomName = body.roomName
-    const identity = body.identity
-    const role = body.role || "viewer"
-
-    // ============================
-    // ✅ VALIDATION
-    // ============================
-    if (!roomName || !identity) {
+    // ✅ SAFE JSON PARSE
+    try {
+      body = await req.json()
+    } catch {
       return NextResponse.json(
-        {
-          success: false,
-          error: "roomName and identity required",
-        },
+        { success: false, error: "Invalid JSON body" },
         { status: 400 }
       )
     }
 
-    // ============================
-    // ✅ ENV VARIABLES
-    // ============================
+    const roomName = body?.roomName
+    const identity = body?.identity
+    const role = body?.role
+
+    console.log("📩 TOKEN REQUEST:", { roomName, identity, role })
+
+    // ✅ VALIDATION
+    if (!roomName || !identity) {
+      return NextResponse.json(
+        { success: false, error: "roomName and identity required" },
+        { status: 400 }
+      )
+    }
+
+    // ✅ ENV CHECK
     const apiKey = process.env.LIVEKIT_API_KEY
     const apiSecret = process.env.LIVEKIT_API_SECRET
-    const livekitUrl = process.env.LIVEKIT_URL
 
-    if (!apiKey || !apiSecret || !livekitUrl) {
+    if (!apiKey || !apiSecret) {
+      console.error("❌ Missing LiveKit ENV keys")
+
       return NextResponse.json(
         {
           success: false,
-          error:
-            "LIVEKIT_API_KEY / LIVEKIT_API_SECRET / LIVEKIT_URL missing in env",
+          error: "LIVEKIT_API_KEY or LIVEKIT_API_SECRET missing",
         },
         { status: 500 }
       )
     }
 
-    // ============================
     // ✅ ROLE CHECK
-    // ============================
-    const isHost = role.toLowerCase() === "host"
+    const isHost = String(role).toLowerCase() === "host"
 
-    // ============================
-    // ✅ CREATE ACCESS TOKEN
-    // ============================
+    // ✅ CREATE TOKEN
     const token = new AccessToken(apiKey, apiSecret, {
       identity,
     })
 
-    // ============================
-    // ✅ GRANTS (HOST vs VIEWER)
-    // ============================
     token.addGrant({
       roomJoin: true,
       room: roomName,
 
-      // Host can publish camera + mic
       canPublish: isHost,
-
-      // Everyone can subscribe
       canSubscribe: true,
-
-      // Everyone can send gifts/chat
       canPublishData: true,
     })
 
-    console.log("✅ TOKEN GENERATED:", {
-      roomName,
-      identity,
-      role,
-      livekitUrl,
-    })
+    console.log("✅ TOKEN GENERATED OK")
 
     return NextResponse.json({
       success: true,
       token: token.toJwt(),
-      url: livekitUrl,
       role: isHost ? "HOST" : "VIEWER",
     })
   } catch (err: any) {
-    console.error("❌ LIVEKIT TOKEN ERROR:", err)
+    console.error("❌ TOKEN API ERROR:", err)
 
     return NextResponse.json(
       {
