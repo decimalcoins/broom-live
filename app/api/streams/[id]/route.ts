@@ -8,10 +8,12 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    console.log("🔥 STREAM DETAIL ROUTE HIT")
+    console.log("PARAM ID =", params.id)
+
     const streamId = params.id
 
-    console.log("✅ STREAM PARAM ID:", streamId)
-
+    // ✅ VALIDATION
     if (!streamId) {
       return NextResponse.json(
         { success: false, error: "Stream ID required" },
@@ -19,9 +21,23 @@ export async function GET(
       )
     }
 
+    // ✅ QUERY STREAM
     const res = await db.query(
       `
-      SELECT *
+      SELECT
+        id,
+        host_id,
+        host_uid,
+        host_username,
+        room_name,
+        title,
+        description,
+        thumbnail_url,
+        is_live,
+        viewer_count,
+        started_at,
+        ended_at,
+        created_at
       FROM streams
       WHERE id=$1
       LIMIT 1
@@ -46,7 +62,7 @@ export async function GET(
     return NextResponse.json(
       {
         success: false,
-        error: err.message || "Failed to fetch stream",
+        error: err.message || "Failed to fetch stream detail",
       },
       { status: 500 }
     )
