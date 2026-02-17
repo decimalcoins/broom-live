@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-
 import { StreamWithChat } from "@/components/stream-with-chat"
 import { StreamSplash } from "@/components/stream-splash"
 
@@ -14,7 +13,7 @@ export default function StreamPage({
 }: {
   params: { id: string }
 }) {
-  const id = params.id
+  const streamId = params.id
 
   const [stream, setStream] = useState<Stream | null>(null)
   const [loading, setLoading] = useState(true)
@@ -22,9 +21,7 @@ export default function StreamPage({
   useEffect(() => {
     const fetchStream = async () => {
       try {
-        setLoading(true)
-
-        const res = await api.get(API_ROUTES.GET_STREAM(id))
+        const res = await api.get(API_ROUTES.GET_STREAM(streamId))
 
         console.log("STREAM DETAIL:", res.data)
 
@@ -35,7 +32,7 @@ export default function StreamPage({
 
         setStream(res.data.stream)
       } catch (err) {
-        console.error("❌ Failed to fetch stream:", err)
+        console.error("❌ Fetch stream failed:", err)
         setStream(null)
       } finally {
         setLoading(false)
@@ -43,11 +40,9 @@ export default function StreamPage({
     }
 
     fetchStream()
-  }, [id])
+  }, [streamId])
 
-  if (loading) {
-    return <StreamSplash label="Joining Stream..." />
-  }
+  if (loading) return <StreamSplash label="Joining Stream..." />
 
   if (!stream) {
     return (
