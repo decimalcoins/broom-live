@@ -35,12 +35,17 @@ export function CreateStreamDialog({
   const [description, setDescription] = useState("")
   const [creating, setCreating] = useState(false)
 
+  // ==========================================
+  // ✅ CREATE STREAM HANDLER (FULL FIX)
+  // ==========================================
   const handleCreate = async () => {
+    // ✅ Guard: user must exist
     if (!userData?.id) {
       alert("❌ User not logged in")
       return
     }
 
+    // ✅ Guard: title required
     if (!title.trim()) {
       alert("❌ Title required")
       return
@@ -49,32 +54,56 @@ export function CreateStreamDialog({
     setCreating(true)
 
     try {
+      // ==========================================
+      // ✅ CALL API CREATE STREAM
+      // ==========================================
       const res = await api.post(API_ROUTES.CREATE_STREAM, {
         userId: userData.id,
         title: title.trim(),
         description: description.trim(),
       })
 
-      console.log("STREAM CREATE RESPONSE:", res.data)
+      console.log("✅ STREAM CREATE RESPONSE:", res.data)
 
+      // ==========================================
+      // ✅ Backend error
+      // ==========================================
       if (!res.data?.success) {
         alert("❌ " + (res.data?.error || "Stream create failed"))
         return
       }
 
+      // ==========================================
+      // ✅ Stream object missing
+      // ==========================================
+      if (!res.data?.stream) {
+        alert("❌ Stream created but stream object missing!")
+        return
+      }
+
+      // ==========================================
+      // ✅ Stream ID missing
+      // ==========================================
       if (!res.data.stream?.id) {
         alert("❌ Stream created but ID missing!")
         return
       }
 
+      // ✅ Extract streamId
       const streamId = res.data.stream.id
 
-      alert("✅ Stream Created!")
+      alert("✅ Stream Created Successfully!")
 
+      // ==========================================
+      // ✅ Reset UI
+      // ==========================================
       setOpen(false)
       setTitle("")
       setDescription("")
 
+      // ==========================================
+      // ✅ Redirect Host → /stream/{id}/host
+      // ==========================================
       onStreamCreated(streamId)
     } catch (err: any) {
       console.error("❌ STREAM CREATE ERROR:", err)
@@ -90,6 +119,9 @@ export function CreateStreamDialog({
     }
   }
 
+  // ==========================================
+  // ✅ UI
+  // ==========================================
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -109,6 +141,7 @@ export function CreateStreamDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
+          {/* TITLE */}
           <div>
             <Label>Stream Title</Label>
             <Input
@@ -118,6 +151,7 @@ export function CreateStreamDialog({
             />
           </div>
 
+          {/* DESCRIPTION */}
           <div>
             <Label>Description</Label>
             <Textarea
@@ -127,6 +161,7 @@ export function CreateStreamDialog({
             />
           </div>
 
+          {/* BUTTON */}
           <Button
             className="w-full"
             disabled={creating}

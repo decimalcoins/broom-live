@@ -13,7 +13,7 @@ export async function POST(req: Request) {
       )
     }
 
-    // ✅ Find user by ID or UID
+    // ✅ Cari user
     const userRes = await db.query(
       `
       SELECT id, uid, username, role
@@ -24,16 +24,15 @@ export async function POST(req: Request) {
       [userId]
     )
 
-    if (userRes.rows.length === 0) {
+    const user = userRes.rows[0]
+
+    if (!user) {
       return NextResponse.json(
         { success: false, error: "User not found" },
         { status: 404 }
       )
     }
 
-    const user = userRes.rows[0]
-
-    // ✅ Only HOST can start
     if (String(user.role).toUpperCase() !== "HOST") {
       return NextResponse.json(
         { success: false, error: "Only HOST can start streams" },
@@ -41,7 +40,7 @@ export async function POST(req: Request) {
       )
     }
 
-    // ✅ Prevent multiple live
+    // ✅ Cegah double live
     const existing = await db.query(
       `
       SELECT id FROM streams
@@ -51,24 +50,28 @@ export async function POST(req: Request) {
       [user.id]
     )
 
-    // ✅ If already live → return same streamId
     if (existing.rows.length > 0) {
-      return NextResponse.json({
-        success: true,
-        streamId: existing.rows[0].id,
-      })
+      return NextResponse.json(
+        { success: false, error: "Stream already active" },
+        { status: 400 }
+      )
     }
 
-    // ✅ Create new stream
+    // ✅ Generate stream ID
     const streamId = crypto.randomUUID()
 
-    await db.query(
+    // ✅ Room name wajib sama dengan Viewer
+    const roomName = `broom_${user.uid}`
+
+    // ✅ Insert stream
+    const streamRes = await db.query(
       `
       INSERT INTO streams (
         id,
         host_id,
         host_uid,
         host_username,
+        room_name,
         title,
         description,
         is_live,
@@ -76,28 +79,35 @@ export async function POST(req: Request) {
         started_at,
         created_at
       )
-      VALUES ($1,$2,$3,$4,$5,$6,true,0,NOW(),NOW())
+      VALUES ($1,$2,$3,$4,$5,$6,$7,true,0,NOW(),NOW())
+      RETURNING *
       `,
       [
         streamId,
         user.id,
         user.uid,
         user.username,
+        roomName,
         title?.trim() || `Live by ${user.username}`,
         description?.trim() || null,
       ]
     )
 
-    // ✅ IMPORTANT: return streamId only
+    console.log("✅ Stream created:", streamRes.rows[0])
+
+    // ✅ RESPONSE WAJIB ADA stream.id
     return NextResponse.json({
       success: true,
-      streamId,
+      stream: streamRes.rows[0],
     })
   } catch (err: any) {
     console.error("❌ CREATE STREAM ERROR:", err)
 
     return NextResponse.json(
-      { success: false, error: "Failed to create stream" },
+      {
+        success: false,
+        error: err.message || "Failed to create stream",
+      },
       { status: 500 }
     )
   }
