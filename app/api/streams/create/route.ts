@@ -2,6 +2,9 @@ import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import crypto from "crypto"
 
+export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
+
 export async function POST(req: Request) {
   try {
     const { userId, title, description } = await req.json()
@@ -13,17 +16,23 @@ export async function POST(req: Request) {
       )
     }
 
-    // ✅ FIND USER
-    const userRes = await db.query(
-      `
-      SELECT id, uid, username, role
-      FROM users
-      WHERE id=$1 OR uid=$1
-      LIMIT 1
-      `,
-      [userId]
-    )
+    // ============================
+    // ✅ FIND USER SAFELY
+    // ============================
+    let userQuery
+    let userParam
 
+    if (/^\d+$/.test(userId)) {
+      // numeric → id
+      userQuery = `SELECT id, uid, username, role FROM users WHERE id=$1 LIMIT 1`
+      userParam = Number(userId)
+    } else {
+      // string → uid
+      userQuery = `SELECT id, uid, username, role FROM users WHERE uid=$1 LIMIT 1`
+      userParam = userId
+    }
+
+    const userRes = await db.query(userQuery, [userParam])
     const user = userRes.rows[0]
 
     if (!user) {
@@ -33,6 +42,9 @@ export async function POST(req: Request) {
       )
     }
 
+    // ============================
+    // ✅ HOST ONLY
+    // ============================
     if (String(user.role).toUpperCase() !== "HOST") {
       return NextResponse.json(
         { success: false, error: "Only HOST can start streams" },
@@ -40,7 +52,9 @@ export async function POST(req: Request) {
       )
     }
 
+    // ============================
     // ✅ CHECK ACTIVE STREAM
+    // ============================
     const existing = await db.query(
       `
       SELECT id FROM streams
@@ -57,13 +71,17 @@ export async function POST(req: Request) {
       )
     }
 
+    // ============================
     // ✅ CREATE STREAM ID
+    // ============================
     const streamId = crypto.randomUUID()
 
-    // ✅ ROOM NAME FIX
-    const roomName = `broom_${user.uid}`
+    // ✅ UNIQUE ROOM PER STREAM
+    const roomName = `broom_${streamId}`
 
+    // ============================
     // ✅ INSERT STREAM
+    // ============================
     const streamRes = await db.query(
       `
       INSERT INTO streams (
@@ -92,8 +110,6 @@ export async function POST(req: Request) {
         description?.trim() || null,
       ]
     )
-
-    console.log("✅ STREAM CREATED:", streamRes.rows[0])
 
     return NextResponse.json({
       success: true,

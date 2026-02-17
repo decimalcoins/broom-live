@@ -1,15 +1,15 @@
-export const dynamic = "force-dynamic"
-
 import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
 
+export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
+
 export async function GET(
   req: Request,
-  context: { params: Promise<{ id: string }> }
+  context: { params: { id: string } }
 ) {
   try {
-    // ✅ FIX WAJIB: params harus di-await
-    const { id } = await context.params
+    const { id } = context.params
 
     if (!id) {
       return NextResponse.json(

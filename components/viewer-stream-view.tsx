@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useEffect, useState } from "react"
+import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 
 import { useLiveKit } from "@/hooks/use-livekit"
@@ -15,75 +15,40 @@ import type { Stream } from "@/lib/types"
 
 interface ViewerStreamViewProps {
   stream: Stream
+  viewerToken: string // ✅ token dari page.tsx
   children?: React.ReactNode
 }
 
-export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
+export function ViewerStreamView({
+  stream,
+  viewerToken,
+  children,
+}: ViewerStreamViewProps) {
   const router = useRouter()
 
-  const [token, setToken] = useState<string | null>(null)
-  const [loadingToken, setLoadingToken] = useState(true)
-  const [tokenError, setTokenError] = useState<string | null>(null)
+  // ======================================================
+  // ✅ ROOM NAME FROM DB
+  // ======================================================
+  const roomName = stream.room_name
 
   // ======================================================
-  // ✅ ROOM NAME MUST COME FROM DB
+  // ✅ LIVEKIT CONNECT
   // ======================================================
-  const roomName = stream.room_name || null
-
   const { room, connect, disconnect, isConnected } = useLiveKit(
     roomName,
-    token,
+    viewerToken,
     "viewer"
   )
 
   // ======================================================
-  // ✅ FETCH VIEWER TOKEN
+  // ✅ CONNECT ON LOAD
   // ======================================================
   useEffect(() => {
-    if (!roomName) return
-
-    const fetchToken = async () => {
-      try {
-        setLoadingToken(true)
-        setTokenError(null)
-
-        const res = await fetch("/api/livekit/token", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            roomName,
-            identity: `viewer-${Date.now()}`,
-            role: "viewer",
-          }),
-        })
-
-        const data = await res.json()
-
-        if (!res.ok || !data.token) {
-          throw new Error(data.error || "Viewer token generation failed")
-        }
-
-        setToken(data.token)
-      } catch (err: any) {
-        console.error("Viewer Token Error:", err)
-        setTokenError(err.message)
-      } finally {
-        setLoadingToken(false)
-      }
-    }
-
-    fetchToken()
-  }, [roomName])
-
-  // ======================================================
-  // ✅ CONNECT ROOM
-  // ======================================================
-  useEffect(() => {
-    if (!token) return
+    if (!viewerToken) return
 
     connect()
     return () => disconnect()
-  }, [token, connect, disconnect])
+  }, [viewerToken, connect, disconnect])
 
   // ======================================================
   // ✅ LISTEN STREAM END + GIFTS
@@ -118,28 +83,12 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
   }, [room, disconnect, router])
 
   // ======================================================
-  // UI STATES
+  // UI STATE
   // ======================================================
-  if (loadingToken) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-black text-white">
-        <p>🔑 Joining stream...</p>
-      </div>
-    )
-  }
-
-  if (tokenError) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-black text-white">
-        <p className="text-red-500">❌ {tokenError}</p>
-      </div>
-    )
-  }
-
   if (!room) {
     return (
       <div className="h-screen flex items-center justify-center bg-black text-white">
-        <p>🔌 Connecting room...</p>
+        <p>🔌 Connecting to stream...</p>
       </div>
     )
   }

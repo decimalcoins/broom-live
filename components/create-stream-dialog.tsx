@@ -32,6 +32,9 @@ export function CreateStreamDialog() {
   const [description, setDescription] = useState("")
   const [creating, setCreating] = useState(false)
 
+  // ============================
+  // CREATE STREAM
+  // ============================
   const handleCreate = async () => {
     if (!userData?.id) {
       alert("❌ User not logged in")
@@ -46,13 +49,14 @@ export function CreateStreamDialog() {
     setCreating(true)
 
     try {
+      // ============================
+      // 1. Create Stream in Backend
+      // ============================
       const res = await api.post(API_ROUTES.CREATE_STREAM, {
         userId: userData.id,
         title: title.trim(),
         description: description.trim(),
       })
-
-      console.log("✅ STREAM CREATE RESPONSE:", res.data)
 
       if (!res.data?.success) {
         alert("❌ " + (res.data?.error || "Stream create failed"))
@@ -66,17 +70,19 @@ export function CreateStreamDialog() {
         return
       }
 
-      alert("✅ Stream Created!")
+      alert("✅ Stream Created! Going Live...")
 
-      // ✅ CLOSE DIALOG
+      // ============================
+      // 2. Close Dialog + Reset
+      // ============================
       setOpen(false)
-
-      // ✅ RESET FORM
       setTitle("")
       setDescription("")
 
-      // ✅ LANGSUNG PINDAH KE HOST STREAM PAGE
-      router.push(`/stream/${streamId}/host`)
+      // ============================
+      // 3. Redirect Host to Broadcast Page
+      // ============================
+      router.push(`/dashboard/host/stream/${streamId}`)
     } catch (err: any) {
       alert("❌ Failed: " + (err?.message || "Unknown error"))
     } finally {
@@ -103,6 +109,7 @@ export function CreateStreamDialog() {
         </DialogHeader>
 
         <div className="space-y-4 py-4">
+          {/* TITLE */}
           <div>
             <Label>Stream Title</Label>
             <Input
@@ -112,6 +119,7 @@ export function CreateStreamDialog() {
             />
           </div>
 
+          {/* DESCRIPTION */}
           <div>
             <Label>Description</Label>
             <Textarea
@@ -121,6 +129,7 @@ export function CreateStreamDialog() {
             />
           </div>
 
+          {/* BUTTON */}
           <Button
             className="w-full"
             disabled={creating}

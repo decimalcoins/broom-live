@@ -13,9 +13,13 @@ import { usePiAuth } from "@/contexts/pi-auth-context"
 
 interface StreamWithChatProps {
   stream: Stream
+  viewerToken: string // ✅ NEW
 }
 
-export function StreamWithChat({ stream }: StreamWithChatProps) {
+export function StreamWithChat({
+  stream,
+  viewerToken,
+}: StreamWithChatProps) {
   const { userData } = usePiAuth()
 
   const [activeGifts, setActiveGifts] = useState<GiftEvent[]>([])
@@ -37,7 +41,6 @@ export function StreamWithChat({ stream }: StreamWithChatProps) {
 
   // ======================================================
   // ✅ LIVEKIT REALTIME GIFT LISTENER
-  // (ViewerStreamView dispatches msg.data directly now)
   // ======================================================
   useEffect(() => {
     const onGiftEvent = (event: any) => {
@@ -66,7 +69,10 @@ export function StreamWithChat({ stream }: StreamWithChatProps) {
   // ✅ UI Render
   // ======================================================
   return (
-    <ViewerStreamView stream={stream}>
+    <ViewerStreamView
+      stream={stream}
+      viewerToken={viewerToken} // ✅ PASS TOKEN
+    >
       {/* 🎁 Gift Animations */}
       {activeGifts.map((gift) => (
         <GiftAnimation
