@@ -16,12 +16,7 @@ export async function GET(
     }
 
     const res = await db.query(
-      `
-      SELECT is_live
-      FROM streams
-      WHERE id=$1
-      LIMIT 1
-      `,
+      `SELECT is_live FROM streams WHERE id=$1 LIMIT 1`,
       [streamId]
     )
 
@@ -37,8 +32,6 @@ export async function GET(
       is_live: res.rows[0].is_live,
     })
   } catch (err) {
-    console.error("❌ Stream status error:", err)
-
     return NextResponse.json(
       { success: false, error: "Failed to fetch status" },
       { status: 500 }
