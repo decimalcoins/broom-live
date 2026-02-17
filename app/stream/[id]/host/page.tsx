@@ -34,7 +34,6 @@ export default function HostDashboardPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([])
   const [loading, setLoading] = useState(true)
-
   const [error, setError] = useState<string | null>(null)
 
   // ============================
@@ -56,7 +55,7 @@ export default function HostDashboardPage() {
         setCoinBalance(coinsRes.data.balance)
       }
 
-      // ✅ TRANSACTIONS
+      // ✅ TRANSACTIONS (optional)
       try {
         const txRes = await api.get(
           API_ROUTES.GET_TRANSACTIONS(userData.id)
@@ -69,7 +68,7 @@ export default function HostDashboardPage() {
         console.warn("Transactions ignored")
       }
 
-      // ✅ WITHDRAWALS
+      // ✅ WITHDRAWALS (optional)
       try {
         const wdRes = await api.get(
           API_ROUTES.GET_WITHDRAWALS(userData.id)
@@ -140,7 +139,7 @@ export default function HostDashboardPage() {
   return (
     <div className="min-h-screen bg-background pb-20">
       <div className="container mx-auto px-4 py-6 max-w-4xl">
-        {/* Header */}
+        {/* HEADER */}
         <div className="mb-6">
           <h1 className="text-3xl font-bold">Host Dashboard</h1>
           <p className="text-muted-foreground">
@@ -148,7 +147,7 @@ export default function HostDashboardPage() {
           </p>
         </div>
 
-        {/* Error */}
+        {/* ERROR */}
         {error && (
           <Card className="mb-6 border-red-500">
             <CardHeader>
@@ -162,7 +161,7 @@ export default function HostDashboardPage() {
           </Card>
         )}
 
-        {/* Stats */}
+        {/* STATS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <Card>
             <CardHeader className="pb-3">
@@ -204,7 +203,7 @@ export default function HostDashboardPage() {
           {/* ✅ FIX HOST REDIRECT */}
           <CreateStreamDialog
             onStreamCreated={(streamId) => {
-              router.push(`/dashboard/host/stream/${streamId}`)
+              router.push(`/stream/${streamId}/host`)
             }}
           />
 
@@ -214,7 +213,7 @@ export default function HostDashboardPage() {
           />
         </div>
 
-        {/* Tabs */}
+        {/* TABS */}
         <Tabs defaultValue="transactions">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="transactions">Transactions</TabsTrigger>
