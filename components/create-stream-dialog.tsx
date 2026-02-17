@@ -49,57 +49,35 @@ export function CreateStreamDialog({
     setCreating(true)
 
     try {
-      // ===============================
-      // ✅ CREATE STREAM API CALL
-      // ===============================
       const res = await api.post(API_ROUTES.CREATE_STREAM, {
         userId: userData.id,
         title: title.trim(),
         description: description.trim(),
       })
 
-      console.log("✅ CREATE STREAM RESPONSE:", res.data)
+      console.log("STREAM CREATE RESPONSE:", res.data)
 
-      // ===============================
-      // ❌ FAIL
-      // ===============================
       if (!res.data?.success) {
         alert("❌ " + (res.data?.error || "Stream create failed"))
         return
       }
 
-      // ===============================
-      // ✅ STREAM OBJECT FIX
-      // ===============================
-      const stream = res.data.stream
+      const streamId = res.data?.stream?.id
 
-      if (!stream?.id) {
-        alert("❌ Stream created but ID missing!")
+      if (!streamId) {
+        alert("❌ Stream created but ID missing")
         return
       }
 
       alert("✅ Stream Created!")
 
-      // ===============================
-      // ✅ RESET FORM
-      // ===============================
       setOpen(false)
       setTitle("")
       setDescription("")
 
-      // ===============================
-      // ✅ REDIRECT TO NEW STREAM ID
-      // ===============================
-      onStreamCreated(stream.id)
+      onStreamCreated(streamId)
     } catch (err: any) {
-      console.error("❌ STREAM CREATE ERROR:", err)
-
-      alert(
-        "❌ Failed to create stream:\n" +
-          (err?.response?.data?.error ||
-            err?.message ||
-            "Unknown error")
-      )
+      alert("❌ Failed: " + (err?.message || "Unknown error"))
     } finally {
       setCreating(false)
     }
