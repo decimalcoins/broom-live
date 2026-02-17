@@ -5,27 +5,44 @@ import { db } from "@/lib/db"
 
 export async function GET(
   req: Request,
-  context: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
-    // ✅ FIX: params must be awaited
-    const { id } = await context.params
+    const streamId = params.id
 
-    if (!id) {
+    // ============================
+    // ✅ Validate ID
+    // ============================
+    if (!streamId) {
       return NextResponse.json(
         { success: false, error: "Stream ID required" },
         { status: 400 }
       )
     }
 
+    // ============================
+    // ✅ Fetch Stream
+    // ============================
     const res = await db.query(
       `
-      SELECT *
+      SELECT
+        id,
+        host_id,
+        host_uid,
+        host_username,
+        room_name,
+        title,
+        description,
+        is_live,
+        viewer_count,
+        started_at,
+        ended_at,
+        created_at
       FROM streams
       WHERE id=$1
       LIMIT 1
       `,
-      [id]
+      [streamId]
     )
 
     if (res.rows.length === 0) {
