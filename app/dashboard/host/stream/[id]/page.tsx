@@ -8,8 +8,6 @@ import {
   VideoConference,
 } from "@livekit/components-react"
 
-import "@livekit/components-styles/dist/styles.css"
-
 export default function HostStreamPage() {
   const params = useParams()
   const router = useRouter()
