@@ -18,15 +18,9 @@ export async function POST(req: Request) {
       )
     }
 
-    // ============================
-    // 0. Prevent Double Completion
-    // ============================
+    // Prevent double complete
     const existing = await client.query(
-      `
-      SELECT status FROM payments
-      WHERE payment_id=$1
-      LIMIT 1
-      `,
+      `SELECT status FROM payments WHERE payment_id=$1 LIMIT 1`,
       [paymentId]
     )
 
@@ -37,9 +31,7 @@ export async function POST(req: Request) {
       )
     }
 
-    // ============================
-    // 1. Complete Payment in Pi API
-    // ============================
+    // Complete in Pi API
     const res = await fetch(
       `${PI_API_BASE}/payments/${paymentId}/complete`,
       {
@@ -60,16 +52,9 @@ export async function POST(req: Request) {
 
     await client.query("BEGIN")
 
-    // ============================
-    // 2. Lock User Row
-    // ============================
+    // Lock user
     const userRes = await client.query(
-      `
-      SELECT id, role, login_order
-      FROM users
-      WHERE id=$1
-      FOR UPDATE
-      `,
+      `SELECT role, login_order FROM users WHERE id=$1 FOR UPDATE`,
       [userId]
     )
 
@@ -83,30 +68,23 @@ export async function POST(req: Request) {
       )
     }
 
-    // Early pioneers should not pay
     if (user.login_order <= 100) {
       await client.query("ROLLBACK")
       return NextResponse.json(
-        {
-          success: false,
-          error: "Early pioneers already receive free HOST access",
-        },
+        { success: false, error: "Early pioneers get HOST free" },
         { status: 400 }
       )
     }
 
-    // Already host
     if (String(user.role).toUpperCase() === "HOST") {
       await client.query("ROLLBACK")
       return NextResponse.json(
-        { success: false, error: "User already HOST" },
+        { success: false, error: "Already HOST" },
         { status: 400 }
       )
     }
 
-    // ============================
-    // 3. Mark Payment Completed
-    // ============================
+    // Mark payment completed
     await client.query(
       `
       UPDATE payments
@@ -116,9 +94,7 @@ export async function POST(req: Request) {
       [paymentId, txid]
     )
 
-    // ============================
-    // 4. Unlock Host + Reward
-    // ============================
+    // Reward unlock
     const rewardCoins = 50000
 
     await client.query(
@@ -131,29 +107,15 @@ export async function POST(req: Request) {
       [rewardCoins, userId]
     )
 
-    // ============================
-    // 5. Save Unlock Record
-    // ============================
-    await client.query(
-      `
-      INSERT INTO host_unlocks (user_id, payment_id, amount_pi, coin_reward)
-      VALUES ($1, $2, 1, $3)
-      ON CONFLICT (payment_id) DO NOTHING
-      `,
-      [userId, paymentId, rewardCoins]
-    )
-
     await client.query("COMMIT")
 
     return NextResponse.json({
       success: true,
-      completed: true,
       reward: rewardCoins,
       payment: data,
     })
   } catch (err) {
     await client.query("ROLLBACK")
-
     console.error("❌ COMPLETE ERROR:", err)
 
     return NextResponse.json(

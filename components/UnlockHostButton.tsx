@@ -7,7 +7,7 @@ export default function UnlockHostButton({ userId }: { userId: string }) {
 
   async function handleUnlock() {
     if (!window.Pi) {
-      alert("❌ Pi SDK not found. Please open this app inside Pi Browser.")
+      alert("❌ Pi SDK not found. Please open inside Pi Browser.")
       return
     }
 
@@ -22,22 +22,12 @@ export default function UnlockHostButton({ userId }: { userId: string }) {
           memo: "Unlock Host Access",
           metadata: { type: "host_unlock" },
         },
-
-        // ============================
-        // ✅ Official Pi Payment Callbacks
-        // ============================
         {
-          // ============================
-          // 1. Server Approval
-          // ============================
-          onReadyForServerApproval: async function (paymentId: string) {
-            console.log("✅ Approving payment:", paymentId)
-
+          // ✅ Approve
+          onReadyForServerApproval: async (paymentId: string) => {
             const res = await fetch("/api/payments/approve", {
               method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
+              headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 paymentId,
                 userId,
@@ -46,26 +36,17 @@ export default function UnlockHostButton({ userId }: { userId: string }) {
             })
 
             const data = await res.json()
-
-            if (!data.success) {
-              throw new Error(data.error || "Approval failed")
-            }
+            if (!data.success) throw new Error(data.error)
           },
 
-          // ============================
-          // 2. Server Completion
-          // ============================
-          onReadyForServerCompletion: async function (
+          // ✅ Complete
+          onReadyForServerCompletion: async (
             paymentId: string,
             txid: string
-          ) {
-            console.log("✅ Completing payment:", paymentId, txid)
-
+          ) => {
             const res = await fetch("/api/payments/complete", {
               method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
+              headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 paymentId,
                 txid,
@@ -76,54 +57,41 @@ export default function UnlockHostButton({ userId }: { userId: string }) {
             const data = await res.json()
 
             if (!data.success) {
-              alert("❌ Payment complete failed: " + data.error)
+              alert("❌ Unlock failed: " + data.error)
               setLoading(false)
               return
             }
 
-            alert("🎉 Host Access Unlocked!\n+50,000 Coins Added")
-
-            // Refresh dashboard state
+            alert("🎉 Host Unlocked! +50,000 Coins")
             window.location.reload()
           },
 
-          // ============================
-          // 3. Cancelled
-          // ============================
-          onCancel: function (paymentId: string) {
-            console.log("❌ Payment cancelled:", paymentId)
+          // Cancel
+          onCancel: () => {
             alert("Payment cancelled.")
             setLoading(false)
           },
 
-          // ============================
-          // 4. Error
-          // ============================
-          onError: function (error: any, payment?: any) {
-            console.error("❌ Payment error:", error, payment)
-            alert("Payment failed: " + (error?.message || "Unknown error"))
+          // Error
+          onError: (err: any) => {
+            alert("Payment error: " + err?.message)
             setLoading(false)
           },
         }
       )
     } catch (err: any) {
-      console.error("❌ Unlock error:", err)
-      alert("Unlock failed: " + (err?.message || "Unknown error"))
+      alert("Unlock failed: " + err.message)
       setLoading(false)
     }
   }
 
   return (
     <button
-      onClick={handleUnlock}
       disabled={loading}
-      className={`px-4 py-2 rounded-xl text-white ${
-        loading ? "bg-gray-400 cursor-not-allowed" : "bg-black"
-      }`}
+      onClick={handleUnlock}
+      className="px-4 py-2 rounded-xl bg-black text-white"
     >
-      {loading
-        ? "Processing Payment..."
-        : "Unlock Host (Pay 1 Pi + Get 50,000 Coins)"}
+      {loading ? "Processing..." : "Unlock Host (Pay 1 Pi)"}
     </button>
   )
 }

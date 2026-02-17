@@ -2,9 +2,6 @@ import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { verifyPiToken } from "@/lib/pi"
 
-/**
- * ✅ Required for Neon + Vercel
- */
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
@@ -21,9 +18,7 @@ export async function POST(req: Request) {
       )
     }
 
-    // =========================================
-    // ✅ 1. Verify Pioneer Identity via Pi API
-    // =========================================
+    // ✅ Verify Pioneer Identity
     const pioneer = await verifyPiToken(pi_auth_token)
 
     if (!pioneer?.uid) {
@@ -38,15 +33,14 @@ export async function POST(req: Request) {
 
     await client.query("BEGIN")
 
-    // =========================================
-    // 2. Find user by Pi UID
-    // =========================================
+    // ✅ Check existing user
     const userRes = await client.query(
       `
       SELECT *
       FROM users
       WHERE uid=$1
       LIMIT 1
+      FOR UPDATE
       `,
       [uid]
     )
@@ -54,22 +48,8 @@ export async function POST(req: Request) {
     let user = userRes.rows[0]
     let bonusCoins = 0
 
-    // =========================================
-    // 3. Create new user if not exists
-    // =========================================
+    // ✅ New User → Assign Pioneer Reward
     if (!user) {
-      // Ensure login_counter exists
-      const counterCheck = await client.query(
-        `SELECT current_value FROM login_counter WHERE id=1 LIMIT 1`
-      )
-
-      if (counterCheck.rows.length === 0) {
-        await client.query(
-          `INSERT INTO login_counter (id, current_value) VALUES (1, 0)`
-        )
-      }
-
-      // Increment login order
       const counterRes = await client.query(
         `
         UPDATE login_counter
@@ -81,9 +61,9 @@ export async function POST(req: Request) {
 
       const loginOrder = counterRes.rows[0].current_value
 
-      // Role + Bonus Tier
       let role = "VIEWER"
 
+      // 🎁 Pioneer Bonus Rules
       if (loginOrder >= 1 && loginOrder <= 20) {
         bonusCoins = 5000
         role = "HOST"
@@ -92,7 +72,6 @@ export async function POST(req: Request) {
         role = "HOST"
       }
 
-      // Insert user
       const createRes = await client.query(
         `
         INSERT INTO users (
@@ -110,21 +89,19 @@ export async function POST(req: Request) {
 
       user = createRes.rows[0]
 
-      // Save bonus claim record
-      await client.query(
-        `
-        INSERT INTO login_bonus_claims (user_id, bonus_amount)
-        VALUES ($1,$2)
-        `,
-        [user.id, bonusCoins]
-      )
+      if (bonusCoins > 0) {
+        await client.query(
+          `
+          INSERT INTO login_bonus_claims (user_id, bonus_amount)
+          VALUES ($1,$2)
+          `,
+          [user.id, bonusCoins]
+        )
+      }
     }
 
     await client.query("COMMIT")
 
-    // =========================================
-    // ✅ 4. Return final profile
-    // =========================================
     return NextResponse.json({
       success: true,
       user: {
@@ -139,11 +116,10 @@ export async function POST(req: Request) {
     })
   } catch (err) {
     await client.query("ROLLBACK")
-
     console.error("❌ /me error:", err)
 
     return NextResponse.json(
-      { success: false, error: "Failed login process" },
+      { success: false, error: "Login process failed" },
       { status: 500 }
     )
   } finally {
