@@ -2,6 +2,12 @@ import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { verifyPiToken } from "@/lib/pi"
 
+/**
+ * ✅ Required for Neon + Vercel
+ */
+export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
+
 export async function POST(req: Request) {
   const client = await db.connect()
 
@@ -33,7 +39,7 @@ export async function POST(req: Request) {
     await client.query("BEGIN")
 
     // =========================================
-    // 2. Cari user berdasarkan UID Pi
+    // 2. Find user by Pi UID
     // =========================================
     const userRes = await client.query(
       `
@@ -41,7 +47,6 @@ export async function POST(req: Request) {
       FROM users
       WHERE uid=$1
       LIMIT 1
-      FOR UPDATE
       `,
       [uid]
     )
@@ -50,9 +55,21 @@ export async function POST(req: Request) {
     let bonusCoins = 0
 
     // =========================================
-    // 3. Jika user baru → create + bonus tier
+    // 3. Create new user if not exists
     // =========================================
     if (!user) {
+      // Ensure login_counter exists
+      const counterCheck = await client.query(
+        `SELECT current_value FROM login_counter WHERE id=1 LIMIT 1`
+      )
+
+      if (counterCheck.rows.length === 0) {
+        await client.query(
+          `INSERT INTO login_counter (id, current_value) VALUES (1, 0)`
+        )
+      }
+
+      // Increment login order
       const counterRes = await client.query(
         `
         UPDATE login_counter
@@ -64,6 +81,7 @@ export async function POST(req: Request) {
 
       const loginOrder = counterRes.rows[0].current_value
 
+      // Role + Bonus Tier
       let role = "VIEWER"
 
       if (loginOrder >= 1 && loginOrder <= 20) {
@@ -74,6 +92,7 @@ export async function POST(req: Request) {
         role = "HOST"
       }
 
+      // Insert user
       const createRes = await client.query(
         `
         INSERT INTO users (
@@ -91,6 +110,7 @@ export async function POST(req: Request) {
 
       user = createRes.rows[0]
 
+      // Save bonus claim record
       await client.query(
         `
         INSERT INTO login_bonus_claims (user_id, bonus_amount)
@@ -103,22 +123,18 @@ export async function POST(req: Request) {
     await client.query("COMMIT")
 
     // =========================================
-    // ✅ 4. Return final updated user (safe)
+    // ✅ 4. Return final profile
     // =========================================
-    const finalUserRes = await client.query(
-      `
-      SELECT id, uid, username, role,
-             coin_balance, login_order
-      FROM users
-      WHERE uid=$1
-      LIMIT 1
-      `,
-      [uid]
-    )
-
     return NextResponse.json({
       success: true,
-      user: finalUserRes.rows[0],
+      user: {
+        id: user.id,
+        uid: user.uid,
+        username: user.username,
+        role: user.role,
+        coin_balance: user.coin_balance,
+        login_order: user.login_order,
+      },
       bonus_awarded: bonusCoins,
     })
   } catch (err) {
