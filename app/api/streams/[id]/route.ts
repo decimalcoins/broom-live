@@ -5,12 +5,11 @@ import { db } from "@/lib/db"
 
 export async function GET(
   req: Request,
-  context: { params: { id: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const streamId = context.params.id
+    const streamId = params.id
 
-    // ✅ VALIDASI ID
     if (!streamId) {
       return NextResponse.json(
         { success: false, error: "Stream ID required" },
@@ -18,20 +17,29 @@ export async function GET(
       )
     }
 
-    console.log("✅ STREAM ID RECEIVED:", streamId)
-
-    // ✅ FETCH STREAM DETAIL
     const res = await db.query(
       `
-      SELECT *
+      SELECT
+        id,
+        host_id,
+        host_uid,
+        host_username,
+        room_name,
+        title,
+        description,
+        thumbnail_url,
+        is_live,
+        viewer_count,
+        started_at,
+        ended_at,
+        created_at
       FROM streams
-      WHERE id=$1
+      WHERE id = $1
       LIMIT 1
       `,
       [streamId]
     )
 
-    // ❌ STREAM NOT FOUND
     if (res.rows.length === 0) {
       return NextResponse.json(
         { success: false, error: "Stream not found" },
@@ -39,7 +47,6 @@ export async function GET(
       )
     }
 
-    // ✅ RETURN STREAM
     return NextResponse.json({
       success: true,
       stream: res.rows[0],

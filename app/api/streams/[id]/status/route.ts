@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic"
+
 import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
 
@@ -6,13 +8,21 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const streamId = Number(params.id)
+    const streamId = params.id
+
+    if (!streamId) {
+      return NextResponse.json(
+        { success: false, error: "Stream ID required" },
+        { status: 400 }
+      )
+    }
 
     const res = await db.query(
       `
       SELECT is_live
       FROM streams
-      WHERE id=$1
+      WHERE id = $1
+      LIMIT 1
       `,
       [streamId]
     )
