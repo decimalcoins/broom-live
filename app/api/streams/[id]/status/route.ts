@@ -3,12 +3,12 @@ import { db } from "@/lib/db"
 
 export async function GET(
   req: Request,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const streamId = params.id
+    const { id } = await context.params
 
-    if (!streamId) {
+    if (!id) {
       return NextResponse.json(
         { success: false, error: "Stream ID required" },
         { status: 400 }
@@ -17,7 +17,7 @@ export async function GET(
 
     const res = await db.query(
       `SELECT is_live FROM streams WHERE id=$1 LIMIT 1`,
-      [streamId]
+      [id]
     )
 
     if (res.rows.length === 0) {
