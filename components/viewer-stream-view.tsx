@@ -25,10 +25,10 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
   const [loadingToken, setLoadingToken] = useState(true)
   const [tokenError, setTokenError] = useState<string | null>(null)
 
-  // ============================
-  // ✅ ROOM NAME MATCH HOST UID
-  // ============================
-  const roomName = stream.host_uid ? `broom_${stream.host_uid}` : null
+  // ======================================================
+  // ✅ ROOM NAME MUST COME FROM DB
+  // ======================================================
+  const roomName = stream.room_name || null
 
   const { room, connect, disconnect, isConnected } = useLiveKit(
     roomName,
@@ -36,9 +36,9 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
     "viewer"
   )
 
-  // ============================
+  // ======================================================
   // ✅ FETCH VIEWER TOKEN
-  // ============================
+  // ======================================================
   useEffect(() => {
     if (!roomName) return
 
@@ -75,19 +75,19 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
     fetchToken()
   }, [roomName])
 
-  // ============================
+  // ======================================================
   // ✅ CONNECT ROOM
-  // ============================
+  // ======================================================
   useEffect(() => {
     if (!token) return
 
     connect()
     return () => disconnect()
-  }, [token])
+  }, [token, connect, disconnect])
 
-  // ============================
+  // ======================================================
   // ✅ LISTEN STREAM END + GIFTS
-  // ============================
+  // ======================================================
   useEffect(() => {
     if (!room) return
 
@@ -115,11 +115,11 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
 
     room.on("dataReceived", handleData)
     return () => room.off("dataReceived", handleData)
-  }, [room])
+  }, [room, disconnect, router])
 
-  // ============================
+  // ======================================================
   // UI STATES
-  // ============================
+  // ======================================================
   if (loadingToken) {
     return (
       <div className="h-screen flex items-center justify-center bg-black text-white">
@@ -144,9 +144,9 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
     )
   }
 
-  // ============================
+  // ======================================================
   // HOST PARTICIPANT
-  // ============================
+  // ======================================================
   const remoteParticipants = Array.from(room.remoteParticipants.values())
 
   const hostParticipant = remoteParticipants.find((p) =>
@@ -161,9 +161,9 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
     )
   }
 
-  // ============================
+  // ======================================================
   // HOST VIDEO TRACK
-  // ============================
+  // ======================================================
   const publication = hostParticipant.getTrackPublication(
     Track.Source.Camera
   )
@@ -171,12 +171,11 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
   const videoTrack = publication?.videoTrack ?? null
   const viewerCount = remoteParticipants.length + 1
 
-  // ============================
+  // ======================================================
   // MAIN UI
-  // ============================
+  // ======================================================
   return (
     <div className="flex flex-col h-screen bg-black relative">
-      {/* VIDEO */}
       {videoTrack ? (
         <VideoPlayer
           track={publication}
@@ -202,7 +201,6 @@ export function ViewerStreamView({ stream, children }: ViewerStreamViewProps) {
         </Card>
       </div>
 
-      {/* CHAT + GIFTS */}
       {children}
     </div>
   )
