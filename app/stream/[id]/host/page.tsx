@@ -37,7 +37,7 @@ export default function HostDashboardPage() {
   const [error, setError] = useState<string | null>(null)
 
   // ============================
-  // FETCH HOST DASHBOARD DATA
+  // FETCH DASHBOARD DATA
   // ============================
   const fetchDashboardData = async () => {
     if (!userData?.id) return
@@ -46,7 +46,7 @@ export default function HostDashboardPage() {
       setLoading(true)
       setError(null)
 
-      // ✅ COIN BALANCE
+      // ✅ COINS
       const coinsRes = await api.get(
         API_ROUTES.GET_USER_COINS(userData.id)
       )
@@ -55,7 +55,7 @@ export default function HostDashboardPage() {
         setCoinBalance(coinsRes.data.balance)
       }
 
-      // ✅ TRANSACTIONS (optional)
+      // ✅ TRANSACTIONS
       try {
         const txRes = await api.get(
           API_ROUTES.GET_TRANSACTIONS(userData.id)
@@ -68,7 +68,7 @@ export default function HostDashboardPage() {
         console.warn("Transactions ignored")
       }
 
-      // ✅ WITHDRAWALS (optional)
+      // ✅ WITHDRAWALS
       try {
         const wdRes = await api.get(
           API_ROUTES.GET_WITHDRAWALS(userData.id)
@@ -200,12 +200,8 @@ export default function HostDashboardPage() {
 
         {/* ACTIONS */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          {/* ✅ FIX HOST REDIRECT */}
-          <CreateStreamDialog
-            onStreamCreated={(streamId) => {
-              router.push(`/stream/${streamId}/host`)
-            }}
-          />
+          {/* ✅ FIXED: NO CALLBACK */}
+          <CreateStreamDialog />
 
           <WithdrawalRequestDialog
             coinBalance={coinBalance}

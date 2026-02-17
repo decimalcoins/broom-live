@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+
 import { usePiAuth } from "@/contexts/pi-auth-context"
 
 import {
@@ -51,25 +52,30 @@ export function CreateStreamDialog() {
         description: description.trim(),
       })
 
+      console.log("✅ STREAM CREATE RESPONSE:", res.data)
+
       if (!res.data?.success) {
-        alert("❌ " + res.data?.error)
+        alert("❌ " + (res.data?.error || "Stream create failed"))
         return
       }
 
       const streamId = res.data?.stream?.id
 
       if (!streamId) {
-        alert("❌ Stream created but ID missing!")
+        alert("❌ Stream created but ID missing")
         return
       }
 
       alert("✅ Stream Created!")
 
+      // ✅ CLOSE DIALOG
       setOpen(false)
+
+      // ✅ RESET FORM
       setTitle("")
       setDescription("")
 
-      // ✅ HOST MASUK KE HALAMAN HOST
+      // ✅ LANGSUNG PINDAH KE HOST STREAM PAGE
       router.push(`/stream/${streamId}/host`)
     } catch (err: any) {
       alert("❌ Failed: " + (err?.message || "Unknown error"))
@@ -81,7 +87,11 @@ export function CreateStreamDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="lg" className="w-full gap-2">
+        <Button
+          size="lg"
+          className="w-full gap-2"
+          disabled={userData?.role !== "HOST"}
+        >
           <Video className="w-5 h-5" />
           Go Live
         </Button>
@@ -111,7 +121,11 @@ export function CreateStreamDialog() {
             />
           </div>
 
-          <Button className="w-full" disabled={creating} onClick={handleCreate}>
+          <Button
+            className="w-full"
+            disabled={creating}
+            onClick={handleCreate}
+          >
             {creating ? "Creating..." : "Start Stream"}
           </Button>
         </div>
