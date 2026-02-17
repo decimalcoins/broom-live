@@ -1,33 +1,48 @@
 "use client"
 
-import Link from "next/link"
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
+
 import { AppSplash } from "@/components/app-splash"
+import { usePiAuth } from "@/contexts/pi-auth-context"
 
 export default function HomePage() {
+  const router = useRouter()
+  const { isAuthenticated, authMessage, reinitialize } = usePiAuth()
+
+  // ============================
+  // Auto Redirect After Login
+  // ============================
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.push("/dashboard")
+    }
+  }, [isAuthenticated, router])
+
   return (
     <AppSplash>
-      <main className="min-h-screen flex flex-col items-center justify-center gap-6">
+      <main className="min-h-screen flex flex-col items-center justify-center gap-6 text-center px-6">
         <h1 className="text-4xl font-bold">BROOM LIVE</h1>
 
-        <p className="text-muted-foreground">
-          Watch & interact with live streams
-        </p>
+        {/* Auth Status */}
+        <p className="text-muted-foreground text-lg">{authMessage}</p>
 
-        <div className="flex gap-4">
-          <Link
-            href="/dashboard"
+        {/* Retry Button if Failed */}
+        {!isAuthenticated && authMessage.includes("❌") && (
+          <button
+            onClick={reinitialize}
             className="px-6 py-3 bg-black text-white rounded-xl"
           >
-            Enter Dashboard
-          </Link>
+            Retry Login
+          </button>
+        )}
 
-          <Link
-            href="/streams"
-            className="px-6 py-3 border rounded-xl"
-          >
-            Live Now
-          </Link>
-        </div>
+        {/* Optional Manual Links */}
+        {!isAuthenticated && (
+          <p className="text-sm text-gray-500">
+            Please open inside Pi Browser to continue.
+          </p>
+        )}
       </main>
     </AppSplash>
   )

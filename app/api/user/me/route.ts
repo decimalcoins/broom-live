@@ -1,23 +1,39 @@
 import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
+import { verifyPiToken } from "@/lib/pi"
 
 export async function POST(req: Request) {
   const client = await db.connect()
 
   try {
-    const { uid, username } = await req.json()
+    const { pi_auth_token } = await req.json()
 
-    if (!uid) {
+    if (!pi_auth_token) {
       return NextResponse.json(
-        { success: false, error: "uid required" },
+        { success: false, error: "Missing Pi Auth Token" },
         { status: 400 }
       )
     }
 
+    // =========================================
+    // ✅ 1. Verify Pioneer Identity via Pi API
+    // =========================================
+    const pioneer = await verifyPiToken(pi_auth_token)
+
+    if (!pioneer?.uid) {
+      return NextResponse.json(
+        { success: false, error: "Invalid Pi Token" },
+        { status: 401 }
+      )
+    }
+
+    const uid = pioneer.uid
+    const username = pioneer.username || "Pioneer"
+
     await client.query("BEGIN")
 
     // =========================================
-    // 1. Cari user berdasarkan UID Pi
+    // 2. Cari user berdasarkan UID Pi
     // =========================================
     const userRes = await client.query(
       `
@@ -34,7 +50,7 @@ export async function POST(req: Request) {
     let bonusCoins = 0
 
     // =========================================
-    // 2. Jika user baru → create + bonus tier
+    // 3. Jika user baru → create + bonus tier
     // =========================================
     if (!user) {
       const counterRes = await client.query(
@@ -70,7 +86,7 @@ export async function POST(req: Request) {
         VALUES ($1,$2,$3,$4,$5)
         RETURNING *
         `,
-        [uid, username || "Pioneer", role, bonusCoins, loginOrder]
+        [uid, username, role, bonusCoins, loginOrder]
       )
 
       user = createRes.rows[0]
@@ -87,9 +103,9 @@ export async function POST(req: Request) {
     await client.query("COMMIT")
 
     // =========================================
-    // ✅ ALWAYS RETURN UPDATED USER BALANCE
+    // ✅ 4. Return final updated user (safe)
     // =========================================
-    const finalUserRes = await db.query(
+    const finalUserRes = await client.query(
       `
       SELECT id, uid, username, role,
              coin_balance, login_order

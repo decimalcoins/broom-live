@@ -3,25 +3,22 @@
 import Link from "next/link"
 import UnlockHostButton from "@/components/UnlockHostButton"
 import { usePiAuth } from "@/contexts/pi-auth-context"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+
+import { AuthLoadingScreen } from "@/components/auth-loading-screen"
+
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 
 export default function DashboardPage() {
   const { userData, authMessage, isAuthenticated } = usePiAuth()
 
-  if (!isAuthenticated) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <p>{authMessage}</p>
-      </div>
-    )
-  }
-
-  if (!userData) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <p>User not found</p>
-      </div>
-    )
+  // ✅ Loading / Auth Guard
+  if (!isAuthenticated || !userData) {
+    return <AuthLoadingScreen message={authMessage || "Loading dashboard..."} />
   }
 
   return (
@@ -45,7 +42,8 @@ export default function DashboardPage() {
               <b>Role:</b> {userData.role}
             </p>
             <p>
-              <b>Coin Balance:</b> {userData.coin_balance.toLocaleString()}
+              <b>Coin Balance:</b>{" "}
+              {userData.coin_balance.toLocaleString()}
             </p>
           </CardContent>
         </Card>
@@ -74,9 +72,8 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               <p>
-                You are currently a viewer.  
-                Unlock host access by paying <b>1 Pi</b> and receive{" "}
-                <b>50,000 Coins</b>.
+                You are currently a viewer. Unlock host access by paying{" "}
+                <b>1 Pi</b> and receive <b>50,000 Coins</b>.
               </p>
 
               <UnlockHostButton userId={userData.id} />

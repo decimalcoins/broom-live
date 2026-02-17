@@ -9,7 +9,6 @@ import React, {
 } from "react"
 
 import { api, setApiAuthToken } from "@/lib/api"
-import { BACKEND_URLS } from "@/lib/system-config"
 import { API_ROUTES } from "@/lib/api-routes"
 
 // ============================
@@ -17,10 +16,6 @@ import { API_ROUTES } from "@/lib/api-routes"
 // ============================
 interface PiAuthResult {
   accessToken: string
-  user: {
-    uid: string
-    username: string
-  }
 }
 
 declare global {
@@ -42,8 +37,6 @@ interface PiAuthContextType {
   isAuthenticated: boolean
   authMessage: string
   userData: LoginDTO | null
-
-  // Retry Support
   reinitialize: () => void
 }
 
@@ -58,13 +51,13 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
   const [userData, setUserData] = useState<LoginDTO | null>(null)
 
   // ============================
-  // MAIN LOGIN FLOW
+  // MAIN AUTH FLOW (Pi Official)
   // ============================
   async function init() {
     try {
       if (typeof window === "undefined") return
 
-      // Reset State
+      // Reset
       setAuthMessage("Loading Pi SDK...")
       setIsAuthenticated(false)
       setUserData(null)
@@ -74,7 +67,7 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
       // ============================
       let tries = 0
       while (!window.Pi && tries < 25) {
-        await new Promise((r) => setTimeout(r, 400))
+        await new Promise((r) => setTimeout(r, 300))
         tries++
       }
 
@@ -94,49 +87,40 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
       })
 
       // ============================
-      // Authenticate Pi User
+      // Authenticate Pioneer
       // ============================
       setAuthMessage("Authenticating with Pi...")
 
       const auth: PiAuthResult = await window.Pi.authenticate(["username"])
 
-      // Save token globally for all API calls
+      if (!auth?.accessToken) {
+        throw new Error("No access token returned from Pi")
+      }
+
+      // Save token globally
       setApiAuthToken(auth.accessToken)
 
       // ============================
-      // Backend Login (verify token)
-      // ============================
-      setAuthMessage("Verifying login token...")
-
-      await api.post(BACKEND_URLS.LOGIN, {
-        pi_auth_token: auth.accessToken,
-      })
-
-      // ============================
-      // Fetch REAL User Profile (/me)
-      // Bonus + Role Auto Unlock happens here
+      // ✅ Official Backend Profile Load
+      // (/me does verify + create user)
       // ============================
       setAuthMessage("Loading user profile...")
 
       const meRes = await api.post(API_ROUTES.GET_ME, {
-        uid: auth.user.uid,
-        username: auth.user.username,
+        pi_auth_token: auth.accessToken,
       })
 
       if (!meRes.data.success) {
-        throw new Error(meRes.data.error || "Failed to load user profile")
+        throw new Error(meRes.data.error || "Failed to load profile")
       }
 
-      // ✅ Always use latest user from backend
       const freshUser: LoginDTO = meRes.data.user
 
-      // Save final user
+      // Save state
       setUserData(freshUser)
       setIsAuthenticated(true)
 
-      // ============================
-      // Message Bonus
-      // ============================
+      // Bonus message
       if (meRes.data.bonus_awarded > 0) {
         setAuthMessage(
           `🎉 Welcome ${freshUser.username}! Bonus +${meRes.data.bonus_awarded} Coins!`
@@ -150,7 +134,7 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  // Auto Init Once
+  // Auto Init
   useEffect(() => {
     init()
   }, [])
