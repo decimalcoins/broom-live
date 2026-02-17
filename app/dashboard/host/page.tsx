@@ -37,9 +37,9 @@ export default function HostDashboardPage() {
 
   const [error, setError] = useState<string | null>(null)
 
-  // ============================
-  // FETCH HOST DASHBOARD DATA
-  // ============================
+  // ======================================================
+  // ✅ FETCH HOST DASHBOARD DATA
+  // ======================================================
   const fetchDashboardData = async () => {
     if (!userData) return
 
@@ -49,62 +49,46 @@ export default function HostDashboardPage() {
       setLoading(true)
       setError(null)
 
-      // ============================
       // ✅ COIN BALANCE
-      // ============================
-      const coinsRes = await api.get(
-        API_ROUTES.GET_USER_COINS(userKey)
-      )
+      const coinsRes = await api.get(API_ROUTES.GET_USER_COINS(userKey))
 
       if (coinsRes.data.success) {
         setCoinBalance(coinsRes.data.balance)
       }
 
-      // ============================
       // ✅ TRANSACTIONS (optional)
-      // ============================
       try {
-        const txRes = await api.get(
-          API_ROUTES.GET_TRANSACTIONS(userKey)
-        )
+        const txRes = await api.get(API_ROUTES.GET_TRANSACTIONS(userKey))
 
         if (txRes.data.success) {
           setTransactions(txRes.data.transactions || [])
         }
-      } catch (txErr) {
+      } catch {
         console.warn("Transactions failed (ignored)")
       }
 
-      // ============================
       // ✅ WITHDRAWALS (optional)
-      // ============================
       try {
-        const wdRes = await api.get(
-          API_ROUTES.GET_WITHDRAWALS(userKey)
-        )
+        const wdRes = await api.get(API_ROUTES.GET_WITHDRAWALS(userKey))
 
         if (wdRes.data.success) {
           setWithdrawals(wdRes.data.withdrawals || [])
         }
-      } catch (wdErr) {
+      } catch {
         console.warn("Withdrawals failed (ignored)")
       }
     } catch (err: any) {
       console.error("❌ HOST DASHBOARD ERROR:", err)
 
-      setError(
-        err?.data?.error ||
-          err?.message ||
-          "Request failed"
-      )
+      setError(err?.message || "Request failed")
     } finally {
       setLoading(false)
     }
   }
 
-  // ============================
-  // ROLE GUARD
-  // ============================
+  // ======================================================
+  // ✅ ROLE GUARD
+  // ======================================================
   useEffect(() => {
     if (!isAuthenticated) return
     if (!userData) return
@@ -117,9 +101,9 @@ export default function HostDashboardPage() {
     fetchDashboardData()
   }, [userData, isAuthenticated])
 
-  // ============================
+  // ======================================================
   // AUTH LOADING
-  // ============================
+  // ======================================================
   if (!isAuthenticated) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -136,9 +120,9 @@ export default function HostDashboardPage() {
     )
   }
 
-  // ============================
+  // ======================================================
   // STATS
-  // ============================
+  // ======================================================
   const totalEarnings = transactions
     .filter((t) => t.type === "gift_received")
     .reduce((sum, t) => sum + t.amount, 0)
@@ -147,12 +131,13 @@ export default function HostDashboardPage() {
     (w) => w.status === "pending"
   )
 
-  // ============================
+  // ======================================================
   // UI
-  // ============================
+  // ======================================================
   return (
     <div className="min-h-screen bg-background pb-20">
       <div className="container mx-auto px-4 py-6 max-w-4xl">
+        {/* HEADER */}
         <div className="mb-6">
           <h1 className="text-3xl font-bold">Host Dashboard</h1>
           <p className="text-muted-foreground">
@@ -176,6 +161,7 @@ export default function HostDashboardPage() {
 
         {/* STATS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          {/* COIN BALANCE */}
           <Card>
             <CardHeader className="pb-3">
               <CardDescription>Coin Balance</CardDescription>
@@ -191,6 +177,7 @@ export default function HostDashboardPage() {
             </CardContent>
           </Card>
 
+          {/* TOTAL EARNINGS */}
           <Card>
             <CardHeader className="pb-3">
               <CardDescription>Total Earnings</CardDescription>
@@ -201,6 +188,7 @@ export default function HostDashboardPage() {
             </CardHeader>
           </Card>
 
+          {/* PENDING WITHDRAWALS */}
           <Card>
             <CardHeader className="pb-3">
               <CardDescription>Pending Withdrawals</CardDescription>
@@ -213,11 +201,8 @@ export default function HostDashboardPage() {
 
         {/* ACTIONS */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <CreateStreamDialog
-            onStreamCreated={(streamId) =>
-              router.push(`/stream/${streamId}`)
-            }
-          />
+          {/* ✅ FIX: NO redirect here */}
+          <CreateStreamDialog />
 
           <WithdrawalRequestDialog
             coinBalance={coinBalance}
@@ -228,12 +213,8 @@ export default function HostDashboardPage() {
         {/* TABS */}
         <Tabs defaultValue="transactions">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="transactions">
-              Transactions
-            </TabsTrigger>
-            <TabsTrigger value="withdrawals">
-              Withdrawals
-            </TabsTrigger>
+            <TabsTrigger value="transactions">Transactions</TabsTrigger>
+            <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
           </TabsList>
 
           <TabsContent value="transactions">
@@ -242,9 +223,7 @@ export default function HostDashboardPage() {
                 No transactions yet
               </p>
             ) : (
-              transactions.map((t) => (
-                <p key={t.id}>{t.type}</p>
-              ))
+              transactions.map((t) => <p key={t.id}>{t.type}</p>)
             )}
           </TabsContent>
 
@@ -254,9 +233,7 @@ export default function HostDashboardPage() {
                 No withdrawals yet
               </p>
             ) : (
-              withdrawals.map((w) => (
-                <p key={w.id}>{w.status}</p>
-              ))
+              withdrawals.map((w) => <p key={w.id}>{w.status}</p>)
             )}
           </TabsContent>
         </Tabs>

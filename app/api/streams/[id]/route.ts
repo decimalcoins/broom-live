@@ -27,14 +27,12 @@ export async function GET(
         room_name,
         title,
         description,
-        thumbnail_url,
         is_live,
         viewer_count,
         started_at,
-        ended_at,
-        created_at
+        ended_at
       FROM streams
-      WHERE id = $1
+      WHERE id=$1
       LIMIT 1
       `,
       [streamId]

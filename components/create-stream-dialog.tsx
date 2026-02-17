@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { usePiAuth } from "@/contexts/pi-auth-context"
 
 import {
@@ -22,12 +23,13 @@ import { api } from "@/lib/api"
 import { API_ROUTES } from "@/lib/api-routes"
 
 interface CreateStreamDialogProps {
-  onStreamCreated: (streamId: string) => void
+  onStreamCreated?: (streamId: string) => void
 }
 
 export function CreateStreamDialog({
   onStreamCreated,
 }: CreateStreamDialogProps) {
+  const router = useRouter()
   const { userData } = usePiAuth()
 
   const [open, setOpen] = useState(false)
@@ -35,9 +37,17 @@ export function CreateStreamDialog({
   const [description, setDescription] = useState("")
   const [creating, setCreating] = useState(false)
 
+  // ======================================================
+  // ✅ CREATE STREAM HANDLER
+  // ======================================================
   const handleCreate = async () => {
     if (!userData?.id) {
       alert("❌ User not logged in")
+      return
+    }
+
+    if (userData.role !== "HOST") {
+      alert("❌ Only HOST can start stream")
       return
     }
 
@@ -49,13 +59,14 @@ export function CreateStreamDialog({
     setCreating(true)
 
     try {
+      // ✅ CALL API CREATE STREAM
       const res = await api.post(API_ROUTES.CREATE_STREAM, {
         userId: userData.id,
         title: title.trim(),
         description: description.trim(),
       })
 
-      console.log("STREAM CREATE RESPONSE:", res.data)
+      console.log("✅ STREAM CREATE RESPONSE:", res.data)
 
       if (!res.data?.success) {
         alert("❌ " + (res.data?.error || "Stream create failed"))
@@ -65,24 +76,43 @@ export function CreateStreamDialog({
       const streamId = res.data?.stream?.id
 
       if (!streamId) {
-        alert("❌ Stream created but ID missing")
+        alert("❌ Stream created but ID missing!")
         return
       }
 
       alert("✅ Stream Created!")
 
+      // ✅ RESET FORM
       setOpen(false)
       setTitle("")
       setDescription("")
 
-      onStreamCreated(streamId)
+      // ✅ CALLBACK OPTIONAL
+      if (onStreamCreated) {
+        onStreamCreated(streamId)
+      }
+
+      // ======================================================
+      // ✅ FIX: HOST MUST GO TO HOST PAGE
+      // ======================================================
+      router.push(`/stream/${streamId}/host`)
     } catch (err: any) {
-      alert("❌ Failed: " + (err?.message || "Unknown error"))
+      console.error("❌ STREAM CREATE ERROR:", err)
+
+      alert(
+        "❌ Failed to create stream:\n" +
+          (err?.response?.data?.error ||
+            err?.message ||
+            "Unknown error")
+      )
     } finally {
       setCreating(false)
     }
   }
 
+  // ======================================================
+  // ✅ UI
+  // ======================================================
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -102,6 +132,7 @@ export function CreateStreamDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
+          {/* TITLE */}
           <div>
             <Label>Stream Title</Label>
             <Input
@@ -111,6 +142,7 @@ export function CreateStreamDialog({
             />
           </div>
 
+          {/* DESCRIPTION */}
           <div>
             <Label>Description</Label>
             <Textarea
@@ -120,6 +152,7 @@ export function CreateStreamDialog({
             />
           </div>
 
+          {/* BUTTON */}
           <Button
             className="w-full"
             disabled={creating}
