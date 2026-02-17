@@ -6,6 +6,9 @@ export async function POST(req: Request) {
   try {
     const { userId, title, description } = await req.json()
 
+    // ============================
+    // ✅ Validate input
+    // ============================
     if (!userId) {
       return NextResponse.json(
         { success: false, error: "userId required" },
@@ -13,7 +16,9 @@ export async function POST(req: Request) {
       )
     }
 
-    // ✅ Cari user
+    // ============================
+    // ✅ Find user (id OR uid)
+    // ============================
     const userRes = await db.query(
       `
       SELECT id, uid, username, role
@@ -33,6 +38,9 @@ export async function POST(req: Request) {
       )
     }
 
+    // ============================
+    // ✅ Role Guard
+    // ============================
     if (String(user.role).toUpperCase() !== "HOST") {
       return NextResponse.json(
         { success: false, error: "Only HOST can start streams" },
@@ -40,30 +48,33 @@ export async function POST(req: Request) {
       )
     }
 
-    // ✅ Cegah double live
-    const existing = await db.query(
+    // ============================
+    // ✅ AUTO END OLD ACTIVE STREAMS
+    // (Fix Stream already active)
+    // ============================
+    await db.query(
       `
-      SELECT id FROM streams
+      UPDATE streams
+      SET is_live=false,
+          ended_at=NOW()
       WHERE host_id=$1 AND is_live=true
-      LIMIT 1
       `,
       [user.id]
     )
 
-    if (existing.rows.length > 0) {
-      return NextResponse.json(
-        { success: false, error: "Stream already active" },
-        { status: 400 }
-      )
-    }
-
-    // ✅ Generate stream ID
+    // ============================
+    // ✅ Generate Stream ID
+    // ============================
     const streamId = crypto.randomUUID()
 
-    // ✅ Room name wajib sama dengan Viewer
+    // ============================
+    // ✅ Room Name MUST MATCH Viewer
+    // ============================
     const roomName = `broom_${user.uid}`
 
-    // ✅ Insert stream
+    // ============================
+    // ✅ Insert New Stream
+    // ============================
     const streamRes = await db.query(
       `
       INSERT INTO streams (
@@ -95,7 +106,9 @@ export async function POST(req: Request) {
 
     console.log("✅ Stream created:", streamRes.rows[0])
 
-    // ✅ RESPONSE WAJIB ADA stream.id
+    // ============================
+    // ✅ Response MUST include stream.id
+    // ============================
     return NextResponse.json({
       success: true,
       stream: streamRes.rows[0],
