@@ -10,6 +10,8 @@ export async function GET(
   try {
     const streamId = params.id
 
+    console.log("✅ STREAM PARAM ID:", streamId)
+
     if (!streamId) {
       return NextResponse.json(
         { success: false, error: "Stream ID required" },
@@ -17,22 +19,9 @@ export async function GET(
       )
     }
 
-    // ✅ Fetch stream detail
     const res = await db.query(
       `
-      SELECT
-        id,
-        host_id,
-        host_uid,
-        host_username,
-        room_name,
-        title,
-        description,
-        thumbnail_url,
-        is_live,
-        viewer_count,
-        started_at,
-        ended_at
+      SELECT *
       FROM streams
       WHERE id=$1
       LIMIT 1
