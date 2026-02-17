@@ -22,7 +22,7 @@ export default function StreamPage({
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    async function fetchStreamAndJoin() {
+    async function loadStream() {
       try {
         setLoading(true)
         setError(null)
@@ -30,48 +30,38 @@ export default function StreamPage({
         // ============================
         // 1. Fetch Stream Detail
         // ============================
-        const res = await api.get(API_ROUTES.GET_STREAM(streamId))
+        const streamRes = await api.get(API_ROUTES.GET_STREAM(streamId))
 
-        if (!res.data.success) {
-          throw new Error(res.data.error || "Stream not found")
+        if (!streamRes.data.success) {
+          throw new Error(streamRes.data.error || "Stream not found")
         }
 
-        const streamData = res.data.stream
-        setStream(streamData)
+        setStream(streamRes.data.stream)
 
         // ============================
-        // 2. Request Viewer Token
+        // 2. Fetch Viewer Token
         // ============================
         const tokenRes = await api.get(
           API_ROUTES.VIEWER_TOKEN(streamId)
         )
 
         if (!tokenRes.data.success) {
-          throw new Error(
-            tokenRes.data.error || "Failed to get viewer token"
-          )
+          throw new Error(tokenRes.data.error || "Token failed")
         }
 
         setViewerToken(tokenRes.data.token)
       } catch (err: any) {
-        console.error("❌ Stream join error:", err)
+        console.error("❌ Join error:", err)
         setError(err.message)
-        setStream(null)
-        setViewerToken(null)
       } finally {
         setLoading(false)
       }
     }
 
-    fetchStreamAndJoin()
+    loadStream()
   }, [streamId])
 
-  // ============================
-  // UI States
-  // ============================
-  if (loading) {
-    return <StreamSplash label="Joining Stream..." />
-  }
+  if (loading) return <StreamSplash label="Joining Stream..." />
 
   if (error) {
     return (
@@ -81,29 +71,13 @@ export default function StreamPage({
     )
   }
 
-  if (!stream) {
+  if (!stream || !viewerToken) {
     return (
       <div className="h-screen flex items-center justify-center bg-black text-white">
-        <p>❌ Stream not found</p>
+        <p>❌ Unable to join stream</p>
       </div>
     )
   }
 
-  if (!viewerToken) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-black text-white">
-        <p>❌ Unable to join LiveKit room</p>
-      </div>
-    )
-  }
-
-  // ============================
-  // Stream Ready
-  // ============================
-  return (
-    <StreamWithChat
-      stream={stream}
-      viewerToken={viewerToken}
-    />
-  )
+  return <StreamWithChat stream={stream} viewerToken={viewerToken} />
 }

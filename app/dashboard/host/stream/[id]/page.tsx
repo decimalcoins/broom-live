@@ -8,7 +8,7 @@ import {
   VideoConference,
 } from "@livekit/components-react"
 
-import "@livekit/components-styles"
+import "@livekit/components-styles/dist/styles.css"
 
 export default function HostStreamPage() {
   const params = useParams()
@@ -18,33 +18,48 @@ export default function HostStreamPage() {
 
   const [token, setToken] = useState<string | null>(null)
 
+  // ============================
+  // FETCH HOST TOKEN
+  // ============================
   useEffect(() => {
     async function startHost() {
-      const res = await fetch(`/api/streams/${streamId}/host-token`)
-      const data = await res.json()
+      try {
+        const res = await fetch(`/api/streams/${streamId}/host-token`)
+        const data = await res.json()
 
-      if (data.success) {
-        setToken(data.token)
-      } else {
-        alert("Failed to start stream")
+        if (data.success) {
+          setToken(data.token)
+        } else {
+          alert("❌ Failed to start stream: " + data.error)
+        }
+      } catch (err) {
+        console.error("Host stream error:", err)
+        alert("❌ Cannot connect to host stream")
       }
     }
 
     startHost()
   }, [streamId])
 
+  // ============================
+  // LOADING STATE
+  // ============================
   if (!token) {
     return (
       <div className="h-screen flex items-center justify-center">
-        <p>Starting live stream...</p>
+        <p>🎥 Starting live stream...</p>
       </div>
     )
   }
 
+  // ============================
+  // MAIN HOST LIVE UI
+  // ============================
   return (
     <div className="h-screen">
+      {/* HEADER */}
       <div className="p-4 flex justify-between border-b">
-        <h1 className="font-bold">🎥 You are LIVE!</h1>
+        <h1 className="font-bold text-xl">🎥 You are LIVE!</h1>
 
         <button
           onClick={() => router.push("/dashboard/host")}
@@ -54,10 +69,12 @@ export default function HostStreamPage() {
         </button>
       </div>
 
+      {/* LIVEKIT ROOM */}
       <LiveKitRoom
         token={token}
         serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL}
         connect={true}
+        data-lk-theme="default"
         style={{ height: "90vh" }}
       >
         <VideoConference />

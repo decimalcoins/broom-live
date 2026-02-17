@@ -13,7 +13,7 @@ import { usePiAuth } from "@/contexts/pi-auth-context"
 
 interface StreamWithChatProps {
   stream: Stream
-  viewerToken: string // ✅ NEW
+  viewerToken: string
 }
 
 export function StreamWithChat({
@@ -22,16 +22,29 @@ export function StreamWithChat({
 }: StreamWithChatProps) {
   const { userData } = usePiAuth()
 
+  // ======================================================
+  // ✅ Gift Animation State
+  // ======================================================
   const [activeGifts, setActiveGifts] = useState<GiftEvent[]>([])
-  const [coinBalance, setCoinBalance] = useState(
-    userData?.coin_balance || 0
-  )
 
   // ======================================================
-  // ✅ Gift Received Handler (Animation)
+  // ✅ Coin Balance State (sync with backend userData)
+  // ======================================================
+  const [coinBalance, setCoinBalance] = useState<number>(0)
+
+  // Sync balance whenever userData changes
+  useEffect(() => {
+    if (userData?.coin_balance !== undefined) {
+      setCoinBalance(userData.coin_balance)
+    }
+  }, [userData])
+
+  // ======================================================
+  // ✅ Gift Received Handler
   // ======================================================
   const handleGiftReceived = (gift: GiftEvent) => {
     console.log("🎁 Gift Animation Triggered:", gift)
+
     setActiveGifts((prev) => [...prev, gift])
   }
 
@@ -40,7 +53,7 @@ export function StreamWithChat({
   }
 
   // ======================================================
-  // ✅ LIVEKIT REALTIME GIFT LISTENER
+  // ✅ LiveKit Gift Listener (Realtime)
   // ======================================================
   useEffect(() => {
     const onGiftEvent = (event: any) => {
@@ -58,21 +71,19 @@ export function StreamWithChat({
   }, [])
 
   // ======================================================
-  // ✅ Gift Sent Handler (Balance Update)
+  // ✅ Gift Sent Handler (Balance Deduction)
   // ======================================================
   const handleGiftSent = (giftCost: number) => {
     setCoinBalance((prev) => Math.max(prev - giftCost, 0))
-    console.log("🎁 Gift sent successfully!")
+
+    console.log("🎁 Gift sent successfully! Cost:", giftCost)
   }
 
   // ======================================================
   // ✅ UI Render
   // ======================================================
   return (
-    <ViewerStreamView
-      stream={stream}
-      viewerToken={viewerToken} // ✅ PASS TOKEN
-    >
+    <ViewerStreamView stream={stream} viewerToken={viewerToken}>
       {/* 🎁 Gift Animations */}
       {activeGifts.map((gift) => (
         <GiftAnimation
@@ -84,12 +95,14 @@ export function StreamWithChat({
 
       {/* Right Overlay */}
       <div className="absolute top-20 right-4 flex flex-col gap-2 z-50">
+        {/* Coin Balance */}
         <CoinBalance balance={coinBalance} />
 
+        {/* Gift Picker */}
         <GiftPicker
           streamId={stream.id}
           hostId={stream.host_id}
-          onGiftSent={(giftCost) => handleGiftSent(giftCost)}
+          onGiftSent={handleGiftSent}
         />
       </div>
 
