@@ -1,28 +1,73 @@
 "use client"
 
 import { useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
 
-import { HostStreamView } from "@/components/host-stream-view"
-import { StreamSplash } from "@/components/stream-splash"
+import { usePiAuth } from "@/contexts/pi-auth-context"
+import { CreateStreamDialog } from "@/components/create-stream-dialog"
 
-export default function HostStreamPage({
-  params,
-}: {
-  params: { id: string }
-}) {
+import { api } from "@/lib/api"
+import { API_ROUTES } from "@/lib/api-routes"
+
+export default function HostDashboardPage() {
   const router = useRouter()
+  const { userData } = usePiAuth()
 
-  // ✅ langsung ambil id dari params
-  const streamId = params.id
+  const [activeStreamId, setActiveStreamId] = useState<string | null>(null)
 
-  // ✅ jika stream selesai → balik dashboard host
-  const handleEndStream = () => {
-    router.push("/dashboard/host")
+  // ============================================
+  // ✅ Auto-check kalau host masih punya stream aktif
+  // ============================================
+  useEffect(() => {
+    if (!userData?.id) return
+
+    const checkActiveStream = async () => {
+      try {
+        const res = await api.get(API_ROUTES.GET_LIVE_STREAMS)
+
+        if (!res.data.success) return
+
+        const myStream = res.data.streams.find(
+          (s: any) => s.host_id === userData.id
+        )
+
+        if (myStream) {
+          console.log("✅ Active Stream Found:", myStream.id)
+          setActiveStreamId(myStream.id)
+        }
+      } catch (err) {
+        console.error("Active stream check error:", err)
+      }
+    }
+
+    checkActiveStream()
+  }, [userData?.id])
+
+  // ============================================
+  // ✅ Redirect kalau stream aktif ada
+  // ============================================
+  const handleGoLive = (streamId: string) => {
+    console.log("🔥 Redirect to Host Stream:", streamId)
+
+    router.push(`/stream/${streamId}/host`)
   }
 
   return (
-    <StreamSplash label="Starting Host Stream...">
-      <HostStreamView streamId={streamId} onEndStream={handleEndStream} />
-    </StreamSplash>
+    <div className="p-6 space-y-6">
+      <h1 className="text-2xl font-bold">Host Dashboard</h1>
+
+      {/* ✅ Jika stream masih aktif */}
+      {activeStreamId && (
+        <button
+          className="w-full p-4 bg-red-600 text-white rounded-xl"
+          onClick={() => router.push(`/stream/${activeStreamId}/host`)}
+        >
+          🔴 Resume Active Stream
+        </button>
+      )}
+
+      {/* ✅ Tombol Create Stream */}
+      <CreateStreamDialog onStreamCreated={handleGoLive} />
+    </div>
   )
 }

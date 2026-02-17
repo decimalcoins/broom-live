@@ -12,32 +12,51 @@ export const API_ROUTES = {
   // ✅ User Profile
   GET_USER: (id: string) => `/api/users/${id}`,
 
-  // ✅ Coin Balance (sesuai folder kamu)
+  // ✅ Coin Balance
   // app/api/user/[id]/coin/route.ts
   GET_USER_COINS: (id: string) => `/api/user/${id}/coin`,
 
-  // ✅ Transactions
-  GET_TRANSACTIONS: (id: string) =>
-    `/api/users/${id}/transactions`,
-
-  // ✅ Current logged user
+  // ✅ Logged user info
   GET_ME: `/api/user/me`,
+
+  // ============================
+  // TRANSACTIONS
+  // ============================
+
+  // app/api/transactions/[id]/route.ts
+  GET_TRANSACTIONS: (id: string) => `/api/transactions/${id}`,
+
+  // ============================
+  // WITHDRAWALS
+  // ============================
+
+  // app/api/withdrawals/request/route.ts
+  REQUEST_WITHDRAWAL: `/api/withdrawals/request`,
+
+  // app/api/withdrawals/host/[id]/route.ts (kalau ada)
+  GET_WITHDRAWALS: (hostId: string) =>
+    `/api/withdrawals/host/${hostId}`,
 
   // ============================
   // STREAMS
   // ============================
 
-  GET_STREAMS: `/api/streams`,
+  // app/api/streams/live/route.ts
+  GET_LIVE_STREAMS: `/api/streams/live`,
 
-  GET_STREAM: (id: string) => `/api/streams/${id}`,
-
+  // app/api/streams/create/route.ts
   CREATE_STREAM: `/api/streams/create`,
 
-  START_STREAM: (id: string) => `/api/streams/${id}/start`,
-  END_STREAM: (id: string) => `/api/streams/${id}/end`,
+  // app/api/streams/[id]/route.ts
+  GET_STREAM: (id: string) => `/api/streams/${id}`,
 
-  LIVE_STREAMS: `/api/streams/live`,
+  // app/api/streams/end/route.ts
+  END_STREAM: `/api/streams/end`,
 
+  // app/api/streams/start/route.ts (kalau ada)
+  START_STREAM: `/api/streams/start`,
+
+  // app/api/streams/[id]/viewer-token/route.ts
   VIEWER_TOKEN: (id: string) =>
     `/api/streams/${id}/viewer-token`,
 
@@ -61,20 +80,10 @@ export const API_ROUTES = {
   PAYMENT_COMPLETE: `/api/payments/complete`,
 
   // ============================
-  // WITHDRAWALS
-  // ============================
-
-  GET_WITHDRAWALS: (hostId: string) =>
-    `/api/withdrawals/host/${hostId}`,
-
-  REQUEST_WITHDRAWAL: `/api/withdrawals/request`,
-
-  // ============================
   // ADMIN
   // ============================
 
   GET_ALL_WITHDRAWALS: `/api/admin/withdrawals`,
-
   PROCESS_WITHDRAWAL: (id: string) =>
     `/api/admin/withdrawals/${id}/process`,
 

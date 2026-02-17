@@ -25,7 +25,9 @@ interface CreateStreamDialogProps {
   onStreamCreated: (streamId: string) => void
 }
 
-export function CreateStreamDialog({ onStreamCreated }: CreateStreamDialogProps) {
+export function CreateStreamDialog({
+  onStreamCreated,
+}: CreateStreamDialogProps) {
   const { userData } = usePiAuth()
 
   const [open, setOpen] = useState(false)
@@ -47,37 +49,56 @@ export function CreateStreamDialog({ onStreamCreated }: CreateStreamDialogProps)
     setCreating(true)
 
     try {
+      // ===============================
+      // ✅ CREATE STREAM API CALL
+      // ===============================
       const res = await api.post(API_ROUTES.CREATE_STREAM, {
         userId: userData.id,
         title: title.trim(),
         description: description.trim(),
       })
 
-      console.log("STREAM CREATE RESPONSE:", res.data)
+      console.log("✅ CREATE STREAM RESPONSE:", res.data)
 
-      if (!res.data.success) {
-        alert("❌ " + res.data.error)
+      // ===============================
+      // ❌ FAIL
+      // ===============================
+      if (!res.data?.success) {
+        alert("❌ " + (res.data?.error || "Stream create failed"))
         return
       }
 
-      const streamId = res.data.stream?.id
+      // ===============================
+      // ✅ STREAM OBJECT FIX
+      // ===============================
+      const stream = res.data.stream
 
-      if (!streamId) {
-        alert("❌ Stream created but ID missing")
+      if (!stream?.id) {
+        alert("❌ Stream created but ID missing!")
         return
       }
 
       alert("✅ Stream Created!")
 
+      // ===============================
+      // ✅ RESET FORM
+      // ===============================
       setOpen(false)
       setTitle("")
       setDescription("")
 
-      onStreamCreated(streamId)
+      // ===============================
+      // ✅ REDIRECT TO NEW STREAM ID
+      // ===============================
+      onStreamCreated(stream.id)
     } catch (err: any) {
+      console.error("❌ STREAM CREATE ERROR:", err)
+
       alert(
         "❌ Failed to create stream:\n" +
-          (err?.response?.data?.error || err.message)
+          (err?.response?.data?.error ||
+            err?.message ||
+            "Unknown error")
       )
     } finally {
       setCreating(false)
@@ -121,7 +142,11 @@ export function CreateStreamDialog({ onStreamCreated }: CreateStreamDialogProps)
             />
           </div>
 
-          <Button className="w-full" disabled={creating} onClick={handleCreate}>
+          <Button
+            className="w-full"
+            disabled={creating}
+            onClick={handleCreate}
+          >
             {creating ? "Creating..." : "Start Stream"}
           </Button>
         </div>
