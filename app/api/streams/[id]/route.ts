@@ -17,9 +17,22 @@ export async function GET(
       )
     }
 
+    // ✅ Fetch stream detail
     const res = await db.query(
       `
-      SELECT *
+      SELECT
+        id,
+        host_id,
+        host_uid,
+        host_username,
+        room_name,
+        title,
+        description,
+        thumbnail_url,
+        is_live,
+        viewer_count,
+        started_at,
+        ended_at
       FROM streams
       WHERE id=$1
       LIMIT 1
