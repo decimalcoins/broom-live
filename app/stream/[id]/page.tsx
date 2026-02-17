@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-
 import { StreamWithChat } from "@/components/stream-with-chat"
 import { StreamSplash } from "@/components/stream-splash"
 
@@ -20,9 +19,6 @@ export default function StreamPage({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // ============================
-  // ✅ FETCH STREAM DETAIL
-  // ============================
   useEffect(() => {
     const fetchStream = async () => {
       try {
@@ -31,22 +27,15 @@ export default function StreamPage({
 
         const res = await api.get(API_ROUTES.GET_STREAM(streamId))
 
-        console.log("🎥 STREAM DETAIL RESPONSE:", res.data)
-
         if (!res.data.success) {
           throw new Error(res.data.error || "Stream not found")
         }
 
         const streamData = res.data.stream
 
-        // ✅ CHECK STREAM LIVE STATUS
-        if (!streamData.is_live) {
-          throw new Error("Stream is offline")
-        }
-
+        // ✅ Jangan reject kalau offline dulu
         setStream(streamData)
       } catch (err: any) {
-        console.error("❌ STREAM FETCH ERROR:", err)
         setError(err.message)
         setStream(null)
       } finally {
@@ -57,16 +46,13 @@ export default function StreamPage({
     fetchStream()
   }, [streamId])
 
-  // ============================
-  // UI STATES
-  // ============================
   if (loading) {
     return <StreamSplash label="Joining Stream..." />
   }
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-screen bg-black text-white">
+      <div className="h-screen flex items-center justify-center bg-black text-white">
         <p className="text-red-500">❌ {error}</p>
       </div>
     )
@@ -74,14 +60,11 @@ export default function StreamPage({
 
   if (!stream) {
     return (
-      <div className="flex items-center justify-center h-screen bg-black text-white">
+      <div className="h-screen flex items-center justify-center bg-black text-white">
         <p>❌ Stream not found</p>
       </div>
     )
   }
 
-  // ============================
-  // ✅ STREAM FOUND + LIVE
-  // ============================
   return <StreamWithChat stream={stream} />
 }

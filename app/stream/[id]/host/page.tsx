@@ -83,7 +83,6 @@ export default function HostDashboardPage() {
       }
     } catch (err: any) {
       console.error("❌ HOST DASHBOARD ERROR:", err)
-
       setError(err?.message || "Failed to load dashboard")
     } finally {
       setLoading(false)
@@ -202,9 +201,10 @@ export default function HostDashboardPage() {
 
         {/* ACTIONS */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          {/* ✅ FIX HOST REDIRECT */}
           <CreateStreamDialog
             onStreamCreated={(streamId) => {
-              router.push(`/stream/${streamId}/host`)
+              router.push(`/dashboard/host/stream/${streamId}`)
             }}
           />
 
