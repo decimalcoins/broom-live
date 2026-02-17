@@ -8,12 +8,9 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    console.log("🔥 STREAM DETAIL ROUTE HIT")
-    console.log("PARAM ID =", params.id)
-
     const streamId = params.id
 
-    // ✅ VALIDATION
+    // ✅ VALIDASI ID
     if (!streamId) {
       return NextResponse.json(
         { success: false, error: "Stream ID required" },
@@ -21,7 +18,7 @@ export async function GET(
       )
     }
 
-    // ✅ QUERY STREAM
+    // ✅ FETCH STREAM DETAIL
     const res = await db.query(
       `
       SELECT
@@ -45,6 +42,7 @@ export async function GET(
       [streamId]
     )
 
+    // ❌ STREAM TIDAK ADA
     if (res.rows.length === 0) {
       return NextResponse.json(
         { success: false, error: "Stream not found" },
@@ -52,6 +50,7 @@ export async function GET(
       )
     }
 
+    // ✅ RETURN STREAM
     return NextResponse.json({
       success: true,
       stream: res.rows[0],
