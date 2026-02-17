@@ -5,8 +5,7 @@ export const dynamic = "force-dynamic"
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json()
-    const { roomName, identity, role } = body
+    const { roomName, identity, role } = await req.json()
 
     if (!roomName || !identity) {
       return NextResponse.json(
@@ -20,7 +19,7 @@ export async function POST(req: Request) {
 
     if (!apiKey || !apiSecret) {
       return NextResponse.json(
-        { success: false, error: "LIVEKIT API KEY/SECRET missing" },
+        { success: false, error: "LiveKit API Key/Secret missing" },
         { status: 500 }
       )
     }
@@ -43,9 +42,7 @@ export async function POST(req: Request) {
       success: true,
       token: token.toJwt(),
     })
-  } catch (err: any) {
-    console.error("❌ LiveKit Token Error:", err)
-
+  } catch (err) {
     return NextResponse.json(
       { success: false, error: "Token generation failed" },
       { status: 500 }
