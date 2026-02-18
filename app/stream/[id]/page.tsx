@@ -36,17 +36,19 @@ export default function StreamPage({
           throw new Error(streamRes.data.error || "Stream not found")
         }
 
-        setStream(streamRes.data.stream)
+        const streamData: Stream = streamRes.data.stream
+        setStream(streamData)
 
         // ============================
         // 2. Fetch Viewer Token
+        // Route: /api/streams/:id/viewer-token
         // ============================
         const tokenRes = await api.get(
           API_ROUTES.VIEWER_TOKEN(streamId)
         )
 
         if (!tokenRes.data.success) {
-          throw new Error(tokenRes.data.error || "Token failed")
+          throw new Error(tokenRes.data.error || "Viewer token failed")
         }
 
         setViewerToken(tokenRes.data.token)
