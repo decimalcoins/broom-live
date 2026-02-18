@@ -8,7 +8,8 @@ import {
   VideoConference,
 } from "@livekit/components-react"
 
-import "@livekit/components-styles"
+// ✅ FIXED IMPORT
+import "@livekit/components-styles/dist/styles.css"
 
 export default function HostStreamPage() {
   const params = useParams()
@@ -44,7 +45,7 @@ export default function HostStreamPage() {
   }, [streamId])
 
   // ============================
-  // Loading State
+  // Loading
   // ============================
   if (!token || !roomName) {
     return (
@@ -55,7 +56,7 @@ export default function HostStreamPage() {
   }
 
   // ============================
-  // MAIN HOST LIVE ROOM
+  // LIVEKIT HOST ROOM
   // ============================
   return (
     <div className="h-screen bg-black">
@@ -71,7 +72,7 @@ export default function HostStreamPage() {
         </button>
       </div>
 
-      {/* LIVEKIT HOST ROOM */}
+      {/* LIVEKIT */}
       <LiveKitRoom
         token={token}
         serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL}
