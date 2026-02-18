@@ -33,10 +33,10 @@ export function CreateStreamDialog() {
   const [creating, setCreating] = useState(false)
 
   // ============================
-  // CREATE STREAM
+  // ✅ CREATE STREAM
   // ============================
   const handleCreate = async () => {
-    if (!userData?.id) {
+    if (!userData?.uid) {
       alert("❌ User not logged in")
       return
     }
@@ -49,11 +49,13 @@ export function CreateStreamDialog() {
     setCreating(true)
 
     try {
+      console.log("✅ Creating stream for UID:", userData.uid)
+
       // ============================
-      // 1. Create Stream in Backend
+      // ✅ SEND UID NOT ID
       // ============================
       const res = await api.post(API_ROUTES.CREATE_STREAM, {
-        userId: userData.id,
+        userId: userData.uid, // ✅ FIXED
         title: title.trim(),
         description: description.trim(),
       })
@@ -63,27 +65,19 @@ export function CreateStreamDialog() {
         return
       }
 
-      const streamId = res.data?.stream?.id
-
-      if (!streamId) {
-        alert("❌ Stream created but ID missing")
-        return
-      }
+      const streamId = res.data.stream.id
 
       alert("✅ Stream Created! Going Live...")
 
-      // ============================
-      // 2. Close Dialog + Reset
-      // ============================
+      // Close dialog
       setOpen(false)
       setTitle("")
       setDescription("")
 
-      // ============================
-      // 3. Redirect Host to Broadcast Page
-      // ============================
+      // Redirect host
       router.push(`/dashboard/host/stream/${streamId}`)
     } catch (err: any) {
+      console.error("❌ Create stream error:", err)
       alert("❌ Failed: " + (err?.message || "Unknown error"))
     } finally {
       setCreating(false)

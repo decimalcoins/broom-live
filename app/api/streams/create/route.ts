@@ -11,40 +11,35 @@ export async function POST(req: Request) {
 
     if (!userId) {
       return NextResponse.json(
-        { success: false, error: "userId required" },
+        { success: false, error: "userId (Pi UID) required" },
         { status: 400 }
       )
     }
 
     // ============================
-    // ✅ FIX: Convert userId to integer if possible
-    // ============================
-    const numericId = Number(userId)
-
-    // ============================
-    // 1. FIND USER (by id OR uid)
+    // ✅ FIX: ONLY SEARCH BY UID
     // ============================
     const userRes = await db.query(
       `
       SELECT id, uid, username, role
       FROM users
-      WHERE id = $1 OR uid = $2
+      WHERE uid=$1
       LIMIT 1
       `,
-      [numericId || -1, userId]
+      [userId]
     )
 
     const user = userRes.rows[0]
 
     if (!user) {
       return NextResponse.json(
-        { success: false, error: "User not found" },
+        { success: false, error: "User not found in database" },
         { status: 404 }
       )
     }
 
     // ============================
-    // 2. ROLE CHECK
+    // ✅ ROLE CHECK
     // ============================
     if (String(user.role).toUpperCase() !== "HOST") {
       return NextResponse.json(
@@ -54,7 +49,7 @@ export async function POST(req: Request) {
     }
 
     // ============================
-    // 3. CHECK ACTIVE STREAM
+    // ✅ ACTIVE STREAM CHECK
     // ============================
     const existing = await db.query(
       `
@@ -74,7 +69,7 @@ export async function POST(req: Request) {
     }
 
     // ============================
-    // 4. CREATE STREAM
+    // ✅ CREATE STREAM
     // ============================
     const streamId = crypto.randomUUID()
     const roomName = `broom_${user.uid}`
