@@ -8,18 +8,20 @@ export async function verifyPiToken(accessToken: string) {
   }
 
   // ============================
-  // ✅ PI API ENDPOINT
+  // ✅ OFFICIAL PI AUTH VERIFY ENDPOINT
   // ============================
-  const res = await fetch(
-    `https://api.minepi.com/v2/me?accessToken=${accessToken}`,
-    {
-      method: "GET",
-      headers: {
-        Authorization: `Key ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-    }
-  )
+  const res = await fetch("https://api.minepi.com/v2/authentication", {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+
+      // ✅ REQUIRED: Server API Key
+      "X-API-Key": apiKey,
+
+      // ✅ REQUIRED: Access Token
+      Authorization: `Bearer ${accessToken}`,
+    },
+  })
 
   if (!res.ok) {
     const errText = await res.text()
@@ -27,11 +29,21 @@ export async function verifyPiToken(accessToken: string) {
     throw new Error("Invalid Pi Access Token")
   }
 
-  // Example response:
+  const data = await res.json()
+
+  // Expected:
   // {
-  //   uid: "abc123",
-  //   username: "pioneer"
+  //   uid: "...",
+  //   username: "...",
+  //   roles: [...]
   // }
 
-  return await res.json()
+  if (!data?.uid) {
+    throw new Error("Pi verification response missing uid")
+  }
+
+  return {
+    uid: data.uid,
+    username: data.username,
+  }
 }

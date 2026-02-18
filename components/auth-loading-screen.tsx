@@ -13,10 +13,16 @@ export function AuthLoadingScreen({ message }: AuthLoadingScreenProps) {
 
   const finalMessage = message || authMessage
 
+  // ✅ Error Detection
   const isError =
     finalMessage.toLowerCase().includes("failed") ||
     finalMessage.toLowerCase().includes("error") ||
     finalMessage.toLowerCase().includes("not detected")
+
+  // ✅ Pi Browser Detection Error
+  const isPiBrowserMissing = finalMessage
+    .toLowerCase()
+    .includes("pi browser")
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-white">
@@ -46,7 +52,9 @@ export function AuthLoadingScreen({ message }: AuthLoadingScreenProps) {
         {/* ✅ MESSAGE */}
         <div className="space-y-2">
           <h2 className="text-xl font-semibold">
-            {isError ? "Authentication Failed" : "Connecting to Pi Network..."}
+            {isError
+              ? "Login Problem"
+              : "Connecting to Pi Network..."}
           </h2>
 
           <p
@@ -56,12 +64,19 @@ export function AuthLoadingScreen({ message }: AuthLoadingScreenProps) {
           >
             {finalMessage}
           </p>
+
+          {/* ✅ Extra Help */}
+          {isPiBrowserMissing && (
+            <p className="text-xs text-gray-500 mt-2">
+              Please open this app inside the official Pi Browser.
+            </p>
+          )}
         </div>
 
         {/* ✅ RETRY */}
         {isError && (
           <Button onClick={reinitialize} className="w-full">
-            Try Again
+            Retry Login
           </Button>
         )}
       </div>
