@@ -17,22 +17,23 @@ export async function POST(req: Request) {
     }
 
     // ============================
-    // ✅ FIND USER SAFELY
+    // ✅ FIX: Convert userId to integer if possible
     // ============================
-    let userQuery
-    let userParam
+    const numericId = Number(userId)
 
-    if (/^\d+$/.test(userId)) {
-      // numeric → id
-      userQuery = `SELECT id, uid, username, role FROM users WHERE id=$1 LIMIT 1`
-      userParam = Number(userId)
-    } else {
-      // string → uid
-      userQuery = `SELECT id, uid, username, role FROM users WHERE uid=$1 LIMIT 1`
-      userParam = userId
-    }
+    // ============================
+    // 1. FIND USER (by id OR uid)
+    // ============================
+    const userRes = await db.query(
+      `
+      SELECT id, uid, username, role
+      FROM users
+      WHERE id = $1 OR uid = $2
+      LIMIT 1
+      `,
+      [numericId || -1, userId]
+    )
 
-    const userRes = await db.query(userQuery, [userParam])
     const user = userRes.rows[0]
 
     if (!user) {
@@ -43,7 +44,7 @@ export async function POST(req: Request) {
     }
 
     // ============================
-    // ✅ HOST ONLY
+    // 2. ROLE CHECK
     // ============================
     if (String(user.role).toUpperCase() !== "HOST") {
       return NextResponse.json(
@@ -53,11 +54,12 @@ export async function POST(req: Request) {
     }
 
     // ============================
-    // ✅ CHECK ACTIVE STREAM
+    // 3. CHECK ACTIVE STREAM
     // ============================
     const existing = await db.query(
       `
-      SELECT id FROM streams
+      SELECT id
+      FROM streams
       WHERE host_id=$1 AND is_live=true
       LIMIT 1
       `,
@@ -72,16 +74,11 @@ export async function POST(req: Request) {
     }
 
     // ============================
-    // ✅ CREATE STREAM ID
+    // 4. CREATE STREAM
     // ============================
     const streamId = crypto.randomUUID()
+    const roomName = `broom_${user.uid}`
 
-    // ✅ UNIQUE ROOM PER STREAM
-    const roomName = `broom_${streamId}`
-
-    // ============================
-    // ✅ INSERT STREAM
-    // ============================
     const streamRes = await db.query(
       `
       INSERT INTO streams (
