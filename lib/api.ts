@@ -12,9 +12,7 @@ export interface ApiError<T = unknown> extends Error {
 
 let authToken: string | null = null
 
-// ✅ BASE URL FIX
-const API_BASE = process.env.NEXT_PUBLIC_APP_URL || ""
-
+// ✅ FIX: Always relative for Next.js API
 const request = async <T = any>(
   url: string,
   init: RequestInit = {}
@@ -27,14 +25,13 @@ const request = async <T = any>(
     headers["Content-Type"] = "application/json"
   }
 
+  // ✅ FIX: Pi Token Must Use Bearer
   if (authToken) {
-    headers["Authorization"] = authToken
+    headers["Authorization"] = `Bearer ${authToken}`
   }
 
-  // ✅ ALWAYS USE ABSOLUTE URL
-  const fullUrl = `${API_BASE}${url}`
-
-  const response = await fetch(fullUrl, {
+  // ✅ FIX: DO NOT USE ABSOLUTE URL
+  const response = await fetch(url, {
     ...init,
     headers,
     credentials: "include",
@@ -97,6 +94,7 @@ export const api = {
     }),
 }
 
+// ✅ Save raw token only
 export const setApiAuthToken = (token: string) => {
   authToken = token
 }
