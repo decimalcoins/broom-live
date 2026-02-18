@@ -3,10 +3,9 @@ export async function verifyPiToken(accessToken: string) {
     method: "GET",
     headers: {
       Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
 
-      // ✅ WAJIB Production Key
-      "X-Pi-Api-Key": process.env.PI_API_KEY!,
+      // ✅ Server API Key Production
+      "X-Pi-Api-Key": process.env.PI_SERVER_API_KEY!,
     },
   })
 
