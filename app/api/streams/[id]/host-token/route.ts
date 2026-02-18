@@ -12,19 +12,12 @@ export async function GET(
   try {
     const streamId = params.id
 
-    if (!streamId) {
-      return NextResponse.json(
-        { success: false, error: "Stream ID required" },
-        { status: 400 }
-      )
-    }
-
     // ============================
-    // 1. Get Stream Room Name
+    // 1. Cari stream dari DB
     // ============================
     const streamRes = await db.query(
       `
-      SELECT room_name, host_uid, host_username
+      SELECT room_name, host_username
       FROM streams
       WHERE id=$1
       LIMIT 1
@@ -39,28 +32,18 @@ export async function GET(
       )
     }
 
-    const { room_name, host_uid, host_username } = streamRes.rows[0]
+    const { room_name, host_username } = streamRes.rows[0]
 
     // ============================
-    // 2. Validate ENV
+    // 2. Generate Host Token LiveKit
     // ============================
-    const apiKey = process.env.LIVEKIT_API_KEY
-    const apiSecret = process.env.LIVEKIT_API_SECRET
-
-    if (!apiKey || !apiSecret) {
-      return NextResponse.json(
-        { success: false, error: "LiveKit env missing" },
-        { status: 500 }
-      )
-    }
-
-    // ============================
-    // 3. Generate Host Token
-    // Identity MUST start with host-
-    // ============================
-    const token = new AccessToken(apiKey, apiSecret, {
-      identity: `host-${host_uid || host_username || streamId}`,
-    })
+    const token = new AccessToken(
+      process.env.LIVEKIT_API_KEY!,
+      process.env.LIVEKIT_API_SECRET!,
+      {
+        identity: `host-${host_username}`,
+      }
+    )
 
     token.addGrant({
       roomJoin: true,
@@ -72,16 +55,12 @@ export async function GET(
     return NextResponse.json({
       success: true,
       token: token.toJwt(),
-      room: room_name,
     })
   } catch (err) {
-    console.error("❌ Host token error:", err)
+    console.error("❌ HOST TOKEN ERROR:", err)
 
     return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to generate host token",
-      },
+      { success: false, error: "Failed to generate host token" },
       { status: 500 }
     )
   }
