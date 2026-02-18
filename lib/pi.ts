@@ -4,7 +4,7 @@ export async function verifyPiToken(accessToken: string) {
     headers: {
       Authorization: `Bearer ${accessToken}`,
 
-      // ✅ Server API Key Production
+      // ✅ WAJIB: Server Key Production
       "X-Pi-Api-Key": process.env.PI_SERVER_API_KEY!,
     },
   })
