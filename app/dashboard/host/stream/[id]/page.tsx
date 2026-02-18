@@ -8,78 +8,46 @@ import {
   VideoConference,
 } from "@livekit/components-react"
 
-// ✅ FIXED IMPORT
-import "@livekit/components-styles/dist/styles.css"
-
 export default function HostStreamPage() {
   const params = useParams()
   const router = useRouter()
 
   const streamId = params.id as string
-
   const [token, setToken] = useState<string | null>(null)
-  const [roomName, setRoomName] = useState<string | null>(null)
 
-  // ============================
-  // Fetch Host Token
-  // ============================
   useEffect(() => {
     async function startHost() {
-      try {
-        const res = await fetch(`/api/streams/${streamId}/host-token`)
-        const data = await res.json()
+      const res = await fetch(`/api/streams/${streamId}/host-token`)
+      const data = await res.json()
 
-        if (!data.success) {
-          alert("❌ Failed to start stream: " + data.error)
-          return
-        }
-
-        setToken(data.token)
-        setRoomName(data.room)
-      } catch (err) {
-        alert("❌ Server error starting stream")
+      if (!data.success) {
+        alert("❌ Failed to start stream: " + data.error)
+        return
       }
+
+      setToken(data.token)
     }
 
     startHost()
   }, [streamId])
 
-  // ============================
-  // Loading
-  // ============================
-  if (!token || !roomName) {
+  if (!token) {
     return (
       <div className="h-screen flex items-center justify-center bg-black text-white">
-        <p>🎥 Starting Live Stream...</p>
+        <p>🎥 Starting live stream...</p>
       </div>
     )
   }
 
-  // ============================
-  // LIVEKIT HOST ROOM
-  // ============================
   return (
     <div className="h-screen bg-black">
-      {/* HEADER */}
-      <div className="p-4 flex justify-between border-b border-white/20 text-white">
-        <h1 className="font-bold">🔴 You are LIVE now!</h1>
-
-        <button
-          onClick={() => router.push("/dashboard/host")}
-          className="px-4 py-2 bg-red-600 rounded-xl"
-        >
-          End Stream
-        </button>
-      </div>
-
-      {/* LIVEKIT */}
       <LiveKitRoom
         token={token}
         serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL}
         connect={true}
-        audio={true}
-        video={true}
-        style={{ height: "90vh" }}
+        audio
+        video
+        style={{ height: "100vh" }}
       >
         <VideoConference />
       </LiveKitRoom>
