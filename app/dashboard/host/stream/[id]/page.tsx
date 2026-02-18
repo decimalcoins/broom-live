@@ -1,65 +1,84 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useRouter } from "next/navigation"
 
-import { LiveKitRoom, VideoConference } from "@livekit/components-react"
+import {
+  LiveKitRoom,
+  VideoConference,
+} from "@livekit/components-react"
 
-export default function HostStreamPage() {
-  const params = useParams()
+export default function HostStreamPage({
+  params,
+}: {
+  params: { id: string }
+}) {
   const router = useRouter()
-
-  const streamId = Array.isArray(params.id)
-    ? params.id[0]
-    : params.id
+  const streamId = params.id
 
   const [token, setToken] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!streamId) return
+    if (!streamId) {
+      setError("Stream ID missing")
+      return
+    }
 
     async function startHost() {
-      const res = await fetch(`/api/streams/${streamId}/host-token`)
-      const data = await res.json()
+      try {
+        const res = await fetch(
+          `/api/streams/${streamId}/host-token`
+        )
 
-      if (data.success) {
+        const data = await res.json()
+
+        if (!data.success) {
+          throw new Error(data.error || "Token failed")
+        }
+
         setToken(data.token)
-      } else {
-        alert("Failed to start stream: " + data.error)
+      } catch (err: any) {
+        console.error("Host start error:", err)
+        setError(err.message)
       }
     }
 
     startHost()
   }, [streamId])
 
+  if (error) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-black text-white">
+        <p className="text-red-500">❌ {error}</p>
+      </div>
+    )
+  }
+
   if (!token) {
     return (
-      <div className="h-screen flex items-center justify-center">
-        <p>Starting live stream...</p>
+      <div className="h-screen flex items-center justify-center bg-black text-white">
+        <p>🎥 Starting live stream...</p>
       </div>
     )
   }
 
   return (
     <div className="h-screen">
-      <div className="p-4 flex justify-between border-b">
-        <h1 className="font-bold">🎥 You are LIVE!</h1>
-
-        <button
-          onClick={() => router.push("/dashboard/host")}
-          className="px-4 py-2 bg-black text-white rounded-xl"
-        >
-          End Stream
-        </button>
-      </div>
-
       <LiveKitRoom
         token={token}
         serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL}
         connect={true}
-        style={{ height: "90vh" }}
+        style={{ height: "100vh" }}
       >
         <VideoConference />
+
+        <button
+          onClick={() => router.push("/dashboard/host")}
+          className="absolute top-4 right-4 bg-red-600 text-white px-4 py-2 rounded-xl"
+        >
+          End Stream
+        </button>
       </LiveKitRoom>
     </div>
   )
