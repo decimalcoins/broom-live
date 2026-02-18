@@ -13,11 +13,11 @@ export async function GET(
     const streamId = params.id
 
     // ============================
-    // 1. Cari stream dari DB
+    // 1. Fetch Stream Room from DB
     // ============================
     const streamRes = await db.query(
       `
-      SELECT room_name, host_username
+      SELECT room_name, host_uid
       FROM streams
       WHERE id=$1
       LIMIT 1
@@ -32,16 +32,16 @@ export async function GET(
       )
     }
 
-    const { room_name, host_username } = streamRes.rows[0]
+    const { room_name, host_uid } = streamRes.rows[0]
 
     // ============================
-    // 2. Generate Host Token LiveKit
+    // 2. Generate Host Token
     // ============================
     const token = new AccessToken(
       process.env.LIVEKIT_API_KEY!,
       process.env.LIVEKIT_API_SECRET!,
       {
-        identity: `host-${host_username}`,
+        identity: `host-${host_uid}`, // ✅ FIXED
       }
     )
 
@@ -55,6 +55,7 @@ export async function GET(
     return NextResponse.json({
       success: true,
       token: token.toJwt(),
+      room: room_name,
     })
   } catch (err) {
     console.error("❌ HOST TOKEN ERROR:", err)

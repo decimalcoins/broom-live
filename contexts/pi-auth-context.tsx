@@ -8,6 +8,8 @@ import React, {
   type ReactNode,
 } from "react"
 
+import { useRouter, usePathname } from "next/navigation"
+
 import { api, setApiAuthToken } from "@/lib/api"
 import { API_ROUTES } from "@/lib/api-routes"
 
@@ -46,18 +48,21 @@ const PiAuthContext = createContext<PiAuthContextType | undefined>(undefined)
 // Provider
 // ============================
 export function PiAuthProvider({ children }: { children: ReactNode }) {
+  const router = useRouter()
+  const pathname = usePathname()
+
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [authMessage, setAuthMessage] = useState("Loading Pi SDK...")
   const [userData, setUserData] = useState<LoginDTO | null>(null)
 
   // ============================
-  // MAIN AUTH FLOW (Pi Official)
+  // MAIN AUTH FLOW
   // ============================
   async function init() {
     try {
       if (typeof window === "undefined") return
 
-      // Reset
+      // Reset state
       setAuthMessage("Loading Pi SDK...")
       setIsAuthenticated(false)
       setUserData(null)
@@ -72,7 +77,7 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (!window.Pi) {
-        setAuthMessage("❌ Pi Browser not detected")
+        setAuthMessage("❌ Please open inside Pi Browser")
         return
       }
 
@@ -101,8 +106,8 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
       setApiAuthToken(auth.accessToken)
 
       // ============================
-      // ✅ Official Backend Profile Load
-      // (/me does verify + create user)
+      // Load Profile from Backend
+      // (/me assigns tier bonus)
       // ============================
       setAuthMessage("Loading user profile...")
 
@@ -128,6 +133,21 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
       } else {
         setAuthMessage(`✅ Welcome back, ${freshUser.username}`)
       }
+
+      // ============================================
+      // ✅ AUTO REDIRECT BASED ON ROLE
+      // ============================================
+      setTimeout(() => {
+        if (freshUser.role === "HOST") {
+          if (!pathname.startsWith("/dashboard/host")) {
+            router.push("/dashboard/host")
+          }
+        } else {
+          if (!pathname.startsWith("/dashboard")) {
+            router.push("/dashboard")
+          }
+        }
+      }, 500)
     } catch (err) {
       console.error("Pi Auth Error:", err)
       setAuthMessage("❌ Authentication failed")

@@ -18,7 +18,9 @@ export async function POST(req: Request) {
       )
     }
 
-    // ✅ Verify Pioneer Identity
+    // =========================================
+    // 1. Verify Pioneer Identity
+    // =========================================
     const pioneer = await verifyPiToken(pi_auth_token)
 
     if (!pioneer?.uid) {
@@ -33,10 +35,12 @@ export async function POST(req: Request) {
 
     await client.query("BEGIN")
 
-    // ✅ Check existing user
+    // =========================================
+    // 2. Check Existing User
+    // =========================================
     const userRes = await client.query(
       `
-      SELECT *
+      SELECT id, uid, username, role, coin_balance, login_order
       FROM users
       WHERE uid=$1
       LIMIT 1
@@ -48,7 +52,9 @@ export async function POST(req: Request) {
     let user = userRes.rows[0]
     let bonusCoins = 0
 
-    // ✅ New User → Assign Pioneer Reward
+    // =========================================
+    // 3. New User → Assign Tier Reward
+    // =========================================
     if (!user) {
       const counterRes = await client.query(
         `
@@ -63,15 +69,16 @@ export async function POST(req: Request) {
 
       let role = "VIEWER"
 
-      // 🎁 Pioneer Bonus Rules
+      // 🎁 Tier Bonus Logic
       if (loginOrder >= 1 && loginOrder <= 20) {
+        role = "HOST"
         bonusCoins = 5000
-        role = "HOST"
       } else if (loginOrder >= 21 && loginOrder <= 100) {
-        bonusCoins = 500
         role = "HOST"
+        bonusCoins = 500
       }
 
+      // Create User
       const createRes = await client.query(
         `
         INSERT INTO users (
@@ -82,13 +89,14 @@ export async function POST(req: Request) {
           login_order
         )
         VALUES ($1,$2,$3,$4,$5)
-        RETURNING *
+        RETURNING id, uid, username, role, coin_balance, login_order
         `,
         [uid, username, role, bonusCoins, loginOrder]
       )
 
       user = createRes.rows[0]
 
+      // Save bonus history
       if (bonusCoins > 0) {
         await client.query(
           `
@@ -102,24 +110,21 @@ export async function POST(req: Request) {
 
     await client.query("COMMIT")
 
+    // =========================================
+    // 4. Return Final User Data
+    // =========================================
     return NextResponse.json({
       success: true,
-      user: {
-        id: user.id,
-        uid: user.uid,
-        username: user.username,
-        role: user.role,
-        coin_balance: user.coin_balance,
-        login_order: user.login_order,
-      },
+      user,
       bonus_awarded: bonusCoins,
     })
-  } catch (err) {
+  } catch (err: any) {
     await client.query("ROLLBACK")
+
     console.error("❌ /me error:", err)
 
     return NextResponse.json(
-      { success: false, error: "Login process failed" },
+      { success: false, error: err.message || "Login failed" },
       { status: 500 }
     )
   } finally {
