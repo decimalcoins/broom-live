@@ -21,27 +21,24 @@ export async function GET(
       )
     }
 
-    // Fetch stream
-    const result = await db.query(
-      `SELECT id, host_id, room_name FROM streams WHERE id=$1 LIMIT 1`,
+    const streamRes = await db.query(
+      `
+      SELECT id, host_id, room_name
+      FROM streams
+      WHERE id=$1
+      LIMIT 1
+      `,
       [streamId]
     )
 
-    if (result.rows.length === 0) {
+    if (streamRes.rows.length === 0) {
       return NextResponse.json(
         { success: false, error: "Stream not found" },
         { status: 404 }
       )
     }
 
-    const stream = result.rows[0]
-
-    if (!stream.room_name) {
-      return NextResponse.json(
-        { success: false, error: "Room name missing in DB" },
-        { status: 400 }
-      )
-    }
+    const stream = streamRes.rows[0]
 
     const apiKey = process.env.LIVEKIT_API_KEY
     const apiSecret = process.env.LIVEKIT_API_SECRET
@@ -73,7 +70,7 @@ export async function GET(
     console.error("❌ HOST TOKEN ERROR:", err)
 
     return NextResponse.json(
-      { success: false, error: err.message },
+      { success: false, error: err?.message },
       { status: 500 }
     )
   }
