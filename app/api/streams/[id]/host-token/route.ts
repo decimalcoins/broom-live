@@ -6,17 +6,14 @@ export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
 export async function GET(
-  req: Request,
+  request: Request,
   { params }: { params: { id: string } }
 ) {
   try {
-    const streamId = params?.id
+    const streamId = params.id
 
-    console.log("🎥 HOST TOKEN REQUEST ID:", streamId)
+    console.log("🔥 HOST TOKEN PARAM ID:", streamId)
 
-    // ============================
-    // VALIDATE STREAM ID
-    // ============================
     if (!streamId) {
       return NextResponse.json(
         { success: false, error: "Stream ID missing" },
@@ -24,10 +21,7 @@ export async function GET(
       )
     }
 
-    // ============================
-    // FETCH STREAM FROM DATABASE
-    // ============================
-    const streamRes = await db.query(
+    const result = await db.query(
       `
       SELECT id, host_id, room_name
       FROM streams
@@ -37,40 +31,25 @@ export async function GET(
       [streamId]
     )
 
-    if (streamRes.rows.length === 0) {
+    if (result.rows.length === 0) {
       return NextResponse.json(
         { success: false, error: "Stream not found" },
         { status: 404 }
       )
     }
 
-    const stream = streamRes.rows[0]
+    const stream = result.rows[0]
 
-    if (!stream.room_name) {
-      return NextResponse.json(
-        { success: false, error: "Room name missing in DB" },
-        { status: 400 }
-      )
-    }
-
-    // ============================
-    // CHECK LIVEKIT ENV
-    // ============================
     const apiKey = process.env.LIVEKIT_API_KEY
     const apiSecret = process.env.LIVEKIT_API_SECRET
 
     if (!apiKey || !apiSecret) {
-      console.error("❌ LiveKit ENV missing")
-
       return NextResponse.json(
-        { success: false, error: "LiveKit env missing" },
+        { success: false, error: "LiveKit ENV missing" },
         { status: 500 }
       )
     }
 
-    // ============================
-    // GENERATE LIVEKIT TOKEN
-    // ============================
     const token = new AccessToken(apiKey, apiSecret, {
       identity: `host-${stream.host_id}`,
     })
@@ -82,21 +61,19 @@ export async function GET(
       canSubscribe: true,
     })
 
-    const jwt = await token.toJwt()
-
     return NextResponse.json({
       success: true,
-      token: jwt,
+      token: token.toJwt(),
       room: stream.room_name,
     })
 
-  } catch (err: any) {
-    console.error("❌ HOST TOKEN ERROR:", err)
+  } catch (error: any) {
+    console.error("❌ HOST TOKEN ERROR:", error)
 
     return NextResponse.json(
       {
         success: false,
-        error: err?.message || "Failed to generate host token",
+        error: error.message,
       },
       { status: 500 }
     )
