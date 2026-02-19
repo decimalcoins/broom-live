@@ -39,38 +39,41 @@ export function HostStreamView({
 
   const [giftEvent, setGiftEvent] = useState<any>(null)
 
-  // ✅ STREAM ROOM NAME
+  // ✅ ROOM NAME FROM DB
   const [roomName, setRoomName] = useState<string | null>(null)
 
-  // ✅ LIVEKIT TOKEN
+  // ✅ HOST TOKEN
   const [token, setToken] = useState<string | null>(null)
-  const [loadingToken, setLoadingToken] = useState(true)
-  const [tokenError, setTokenError] = useState<string | null>(null)
+
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   // ======================================================
-  // ✅ STEP 1 — FETCH STREAM DETAIL (FIXED ENDPOINT)
+  // ✅ STEP 1 — FETCH STREAM DETAIL
+  // Endpoint: /api/streams/[id]
   // ======================================================
   useEffect(() => {
     if (!streamId) return
 
     async function fetchStreamDetail() {
       try {
-        const res = await fetch(
-          `/api/streams/detail/${streamId}` // ✅ FIXED
-        )
-
+        const res = await fetch(`/api/streams/${streamId}`)
         const data = await res.json()
 
         console.log("🎥 STREAM DETAIL:", data)
 
-        if (!data.success || !data.stream?.room_name) {
-          throw new Error("Stream room_name not found")
+        if (!data.success) {
+          throw new Error(data.error || "Stream not found")
+        }
+
+        if (!data.stream?.room_name) {
+          throw new Error("room_name missing in DB")
         }
 
         setRoomName(data.stream.room_name)
       } catch (err: any) {
-        console.error("❌ Stream Fetch Error:", err)
-        setTokenError(err.message)
+        console.error("❌ Stream Detail Error:", err)
+        setError(err.message)
       }
     }
 
@@ -78,30 +81,14 @@ export function HostStreamView({
   }, [streamId])
 
   // ======================================================
-  // ✅ STEP 2 — LIVEKIT HOOK INIT
-  // ======================================================
-  const {
-    room,
-    isConnected,
-    cameraEnabled,
-    micEnabled,
-    connect,
-    disconnect,
-    toggleCamera,
-    toggleMic,
-  } = useLiveKit(roomName, token, "host")
-
-  // ======================================================
-  // ✅ STEP 3 — FETCH HOST TOKEN
+  // ✅ STEP 2 — FETCH HOST TOKEN
+  // Endpoint: /api/streams/[id]/host-token
   // ======================================================
   useEffect(() => {
     if (!streamId) return
 
     async function fetchHostToken() {
       try {
-        setLoadingToken(true)
-        setTokenError(null)
-
         const res = await fetch(
           `/api/streams/${streamId}/host-token`
         )
@@ -110,16 +97,16 @@ export function HostStreamView({
 
         console.log("🔑 HOST TOKEN:", data)
 
-        if (!data.success || !data.token) {
+        if (!data.success) {
           throw new Error(data.error || "Host token failed")
         }
 
         setToken(data.token)
       } catch (err: any) {
         console.error("❌ Host Token Error:", err)
-        setTokenError(err.message)
+        setError(err.message)
       } finally {
-        setLoadingToken(false)
+        setLoading(false)
       }
     }
 
@@ -127,17 +114,28 @@ export function HostStreamView({
   }, [streamId])
 
   // ======================================================
-  // ✅ STEP 4 — CONNECT WHEN TOKEN READY
+  // ✅ STEP 3 — LIVEKIT CONNECT
   // ======================================================
+  const {
+    room,
+    connect,
+    disconnect,
+    toggleCamera,
+    toggleMic,
+    cameraEnabled,
+    micEnabled,
+    isConnected,
+  } = useLiveKit(roomName, token, "host")
+
   useEffect(() => {
     if (!token) return
 
     connect()
     return () => disconnect()
-  }, [token, connect, disconnect])
+  }, [token])
 
   // ======================================================
-  // ✅ STEP 5 — LISTEN GIFTS
+  // ✅ STEP 4 — LISTEN GIFTS REALTIME
   // ======================================================
   useEffect(() => {
     if (!room) return
@@ -161,15 +159,16 @@ export function HostStreamView({
 
     room.on("dataReceived", handleData)
     return () => room.off("dataReceived", handleData)
-  }, [room, addCoins])
+  }, [room])
 
   // ======================================================
-  // ✅ STEP 6 — END STREAM
+  // ✅ END STREAM
   // ======================================================
   const handleEndStream = async () => {
     if (!room || !userData) return
 
     try {
+      // Notify viewers
       room.localParticipant.publishData(
         new TextEncoder().encode(
           JSON.stringify({ type: "stream_end" })
@@ -177,6 +176,7 @@ export function HostStreamView({
         { reliable: true }
       )
 
+      // Update DB
       await fetch("/api/streams/end", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -186,7 +186,7 @@ export function HostStreamView({
         }),
       })
     } catch (err) {
-      console.error("❌ End stream failed:", err)
+      console.error("❌ End stream error:", err)
     }
 
     disconnect()
@@ -196,18 +196,18 @@ export function HostStreamView({
   // ======================================================
   // UI STATES
   // ======================================================
-  if (loadingToken) {
+  if (loading) {
     return (
       <div className="h-screen flex items-center justify-center bg-black text-white">
-        <p>🔑 Generating host token...</p>
+        <p>🔑 Starting stream...</p>
       </div>
     )
   }
 
-  if (tokenError) {
+  if (error) {
     return (
       <div className="h-screen flex items-center justify-center bg-black text-white">
-        <p className="text-red-500">❌ {tokenError}</p>
+        <p className="text-red-500">❌ {error}</p>
       </div>
     )
   }
@@ -215,7 +215,7 @@ export function HostStreamView({
   if (!room) {
     return (
       <div className="h-screen flex items-center justify-center bg-black text-white">
-        <p>🔌 Connecting to LiveKit room...</p>
+        <p>🔌 Connecting LiveKit...</p>
       </div>
     )
   }
@@ -223,16 +223,18 @@ export function HostStreamView({
   // ======================================================
   // LOCAL CAMERA TRACK
   // ======================================================
-  const publication = room.localParticipant.getTrackPublication(
-    Track.Source.Camera
-  )
+  const publication =
+    room.localParticipant.getTrackPublication(
+      Track.Source.Camera
+    )
 
   // ======================================================
-  // MAIN HOST UI
+  // MAIN UI
   // ======================================================
   return (
     <LiveKitProvider room={room}>
       <div className="flex flex-col h-screen bg-black relative">
+        {/* VIDEO */}
         {publication ? (
           <VideoPlayer track={publication} isLocal />
         ) : (
@@ -241,14 +243,14 @@ export function HostStreamView({
           </div>
         )}
 
+        {/* LIVE BADGE */}
         <div className="absolute top-4 right-4">
-          <Card className="px-3 py-2 bg-black/60 text-white border-white/20">
-            <p className="text-sm font-bold">
-              {isConnected ? "🔴 LIVE" : "Connecting..."}
-            </p>
+          <Card className="px-3 py-2 bg-black/60 text-white">
+            {isConnected ? "🔴 LIVE" : "Connecting..."}
           </Card>
         </div>
 
+        {/* 🎁 Gift Animation */}
         {giftEvent && (
           <GiftAnimation
             gift={giftEvent}
@@ -256,33 +258,20 @@ export function HostStreamView({
           />
         )}
 
+        {/* 💬 Chat */}
         <ChatPanel username={userData?.username || "Host"} />
 
+        {/* CONTROLS */}
         <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-4">
-          <Button
-            size="lg"
-            variant={cameraEnabled ? "default" : "destructive"}
-            onClick={toggleCamera}
-            className="rounded-full w-14 h-14"
-          >
+          <Button onClick={toggleCamera}>
             {cameraEnabled ? <Video /> : <VideoOff />}
           </Button>
 
-          <Button
-            size="lg"
-            variant={micEnabled ? "default" : "destructive"}
-            onClick={toggleMic}
-            className="rounded-full w-14 h-14"
-          >
+          <Button onClick={toggleMic}>
             {micEnabled ? <Mic /> : <MicOff />}
           </Button>
 
-          <Button
-            size="lg"
-            variant="destructive"
-            onClick={handleEndStream}
-            className="rounded-full w-14 h-14"
-          >
+          <Button variant="destructive" onClick={handleEndStream}>
             <StopCircle />
           </Button>
         </div>
