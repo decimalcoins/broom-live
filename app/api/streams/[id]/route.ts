@@ -8,9 +8,7 @@ export async function GET(
   req: Request,
   { params }: { params: { id: string } }
 ) {
-  console.log("PARAMS:", params)
-
-  const streamId = params?.id
+  const streamId = params.id
 
   if (!streamId) {
     return NextResponse.json(
