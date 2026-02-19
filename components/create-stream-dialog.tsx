@@ -52,10 +52,10 @@ export function CreateStreamDialog() {
       console.log("✅ Creating stream for UID:", userData.uid)
 
       // ============================
-      // ✅ SEND UID NOT ID
+      // ✅ SEND UID (Pi Identity)
       // ============================
       const res = await api.post(API_ROUTES.CREATE_STREAM, {
-        userId: userData.uid, // ✅ FIXED
+        userId: userData.uid,
         title: title.trim(),
         description: description.trim(),
       })
@@ -69,13 +69,17 @@ export function CreateStreamDialog() {
 
       alert("✅ Stream Created! Going Live...")
 
-      // Close dialog
+      // ============================
+      // ✅ CLOSE DIALOG + RESET
+      // ============================
       setOpen(false)
       setTitle("")
       setDescription("")
 
-      // Redirect host
-      router.push(`/dashboard/host/stream/${streamId}`)
+      // ============================
+      // ✅ FIXED HOST REDIRECT
+      // ============================
+      router.push(`/stream/${streamId}/host`)
     } catch (err: any) {
       console.error("❌ Create stream error:", err)
       alert("❌ Failed: " + (err?.message || "Unknown error"))
