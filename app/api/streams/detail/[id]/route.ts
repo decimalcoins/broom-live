@@ -6,12 +6,12 @@ export const dynamic = "force-dynamic"
 
 export async function GET(
   req: Request,
-  context: { params: { id: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = context.params
+    const streamId = params.id
 
-    if (!id) {
+    if (!streamId) {
       return NextResponse.json(
         { success: false, error: "Stream ID required" },
         { status: 400 }
@@ -25,7 +25,7 @@ export async function GET(
       WHERE id=$1
       LIMIT 1
       `,
-      [id]
+      [streamId]
     )
 
     if (res.rows.length === 0) {
@@ -39,7 +39,7 @@ export async function GET(
       success: true,
       stream: res.rows[0],
     })
-  } catch (err: any) {
+  } catch (err) {
     console.error("❌ STREAM DETAIL ERROR:", err)
 
     return NextResponse.json(

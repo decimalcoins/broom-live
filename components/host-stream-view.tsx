@@ -39,27 +39,26 @@ export function HostStreamView({
 
   const [giftEvent, setGiftEvent] = useState<any>(null)
 
-  // ===============================
-  // STREAM DATA
-  // ===============================
+  // ✅ STREAM ROOM NAME
   const [roomName, setRoomName] = useState<string | null>(null)
 
-  // ===============================
-  // LIVEKIT TOKEN
-  // ===============================
+  // ✅ LIVEKIT TOKEN
   const [token, setToken] = useState<string | null>(null)
   const [loadingToken, setLoadingToken] = useState(true)
   const [tokenError, setTokenError] = useState<string | null>(null)
 
   // ======================================================
-  // ✅ STEP 1 — FETCH STREAM DETAIL (room_name)
+  // ✅ STEP 1 — FETCH STREAM DETAIL (FIXED ENDPOINT)
   // ======================================================
   useEffect(() => {
     if (!streamId) return
 
-    const fetchStream = async () => {
+    async function fetchStreamDetail() {
       try {
-        const res = await fetch(`/api/streams/${streamId}`)
+        const res = await fetch(
+          `/api/streams/detail/${streamId}` // ✅ FIXED
+        )
+
         const data = await res.json()
 
         console.log("🎥 STREAM DETAIL:", data)
@@ -75,7 +74,7 @@ export function HostStreamView({
       }
     }
 
-    fetchStream()
+    fetchStreamDetail()
   }, [streamId])
 
   // ======================================================
@@ -93,12 +92,12 @@ export function HostStreamView({
   } = useLiveKit(roomName, token, "host")
 
   // ======================================================
-  // ✅ STEP 3 — FETCH HOST TOKEN (CORRECT ENDPOINT)
+  // ✅ STEP 3 — FETCH HOST TOKEN
   // ======================================================
   useEffect(() => {
     if (!streamId) return
 
-    const fetchHostToken = async () => {
+    async function fetchHostToken() {
       try {
         setLoadingToken(true)
         setTokenError(null)
@@ -109,7 +108,7 @@ export function HostStreamView({
 
         const data = await res.json()
 
-        console.log("🔑 HOST TOKEN RESPONSE:", data)
+        console.log("🔑 HOST TOKEN:", data)
 
         if (!data.success || !data.token) {
           throw new Error(data.error || "Host token failed")
@@ -128,18 +127,17 @@ export function HostStreamView({
   }, [streamId])
 
   // ======================================================
-  // ✅ STEP 4 — CONNECT LIVEKIT WHEN TOKEN READY
+  // ✅ STEP 4 — CONNECT WHEN TOKEN READY
   // ======================================================
   useEffect(() => {
     if (!token) return
 
     connect()
-
     return () => disconnect()
   }, [token, connect, disconnect])
 
   // ======================================================
-  // ✅ STEP 5 — REALTIME GIFTS LISTENER
+  // ✅ STEP 5 — LISTEN GIFTS
   // ======================================================
   useEffect(() => {
     if (!room) return
@@ -162,20 +160,16 @@ export function HostStreamView({
     }
 
     room.on("dataReceived", handleData)
-
-    return () => {
-      room.off("dataReceived", handleData)
-    }
+    return () => room.off("dataReceived", handleData)
   }, [room, addCoins])
 
   // ======================================================
-  // ✅ STEP 6 — END STREAM CLEANLY
+  // ✅ STEP 6 — END STREAM
   // ======================================================
   const handleEndStream = async () => {
     if (!room || !userData) return
 
     try {
-      // Notify viewers
       room.localParticipant.publishData(
         new TextEncoder().encode(
           JSON.stringify({ type: "stream_end" })
@@ -183,13 +177,12 @@ export function HostStreamView({
         { reliable: true }
       )
 
-      // Update DB
       await fetch("/api/streams/end", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           streamId,
-          userId: userData.uid, // ✅ FIXED UID
+          userId: userData.uid,
         }),
       })
     } catch (err) {
@@ -240,7 +233,6 @@ export function HostStreamView({
   return (
     <LiveKitProvider room={room}>
       <div className="flex flex-col h-screen bg-black relative">
-        {/* VIDEO */}
         {publication ? (
           <VideoPlayer track={publication} isLocal />
         ) : (
@@ -249,7 +241,6 @@ export function HostStreamView({
           </div>
         )}
 
-        {/* LIVE BADGE */}
         <div className="absolute top-4 right-4">
           <Card className="px-3 py-2 bg-black/60 text-white border-white/20">
             <p className="text-sm font-bold">
@@ -258,7 +249,6 @@ export function HostStreamView({
           </Card>
         </div>
 
-        {/* 🎁 Gift Animation */}
         {giftEvent && (
           <GiftAnimation
             gift={giftEvent}
@@ -266,10 +256,8 @@ export function HostStreamView({
           />
         )}
 
-        {/* 💬 Chat */}
         <ChatPanel username={userData?.username || "Host"} />
 
-        {/* CONTROLS */}
         <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-4">
           <Button
             size="lg"
