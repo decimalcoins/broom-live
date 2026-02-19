@@ -6,12 +6,12 @@ export const dynamic = "force-dynamic"
 
 export async function GET(
   req: Request,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
-    const streamId = params.id
+    const streamId = context.params.id
 
-    console.log("🔥 STREAM PARAM ID =", streamId)
+    console.log("🔥 STREAM ID =", streamId)
 
     if (!streamId) {
       return NextResponse.json(
@@ -21,7 +21,12 @@ export async function GET(
     }
 
     const res = await db.query(
-      `SELECT * FROM streams WHERE id=$1 LIMIT 1`,
+      `
+      SELECT *
+      FROM streams
+      WHERE id=$1
+      LIMIT 1
+      `,
       [streamId]
     )
 
@@ -36,11 +41,11 @@ export async function GET(
       success: true,
       stream: res.rows[0],
     })
-  } catch (err: any) {
-    console.error("STREAM DETAIL ERROR:", err)
+  } catch (err) {
+    console.error("❌ STREAM DETAIL ERROR:", err)
 
     return NextResponse.json(
-      { success: false, error: err.message },
+      { success: false, error: "Failed to fetch stream" },
       { status: 500 }
     )
   }
