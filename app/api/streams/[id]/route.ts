@@ -9,9 +9,9 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    console.log("🔥 STREAM DETAIL PARAMS:", params)
+    const streamId = params.id
 
-    const streamId = params?.id
+    console.log("🔥 STREAM PARAM ID =", streamId)
 
     if (!streamId) {
       return NextResponse.json(
@@ -21,12 +21,7 @@ export async function GET(
     }
 
     const res = await db.query(
-      `
-      SELECT *
-      FROM streams
-      WHERE id=$1
-      LIMIT 1
-      `,
+      `SELECT * FROM streams WHERE id=$1 LIMIT 1`,
       [streamId]
     )
 
@@ -42,10 +37,10 @@ export async function GET(
       stream: res.rows[0],
     })
   } catch (err: any) {
-    console.error("❌ STREAM DETAIL ERROR:", err)
+    console.error("STREAM DETAIL ERROR:", err)
 
     return NextResponse.json(
-      { success: false, error: "Failed to fetch stream" },
+      { success: false, error: err.message },
       { status: 500 }
     )
   }
