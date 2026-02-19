@@ -7,13 +7,16 @@ export const dynamic = "force-dynamic"
 
 export async function GET(
   req: Request,
-  context: { params: { id: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const streamId = context?.params?.id
+    const streamId = params?.id
 
     console.log("🎥 HOST TOKEN REQUEST ID:", streamId)
 
+    // ============================
+    // VALIDATE STREAM ID
+    // ============================
     if (!streamId) {
       return NextResponse.json(
         { success: false, error: "Stream ID missing" },
@@ -22,13 +25,13 @@ export async function GET(
     }
 
     // ============================
-    // 1. Fetch Stream from DB
+    // FETCH STREAM FROM DATABASE
     // ============================
     const streamRes = await db.query(
       `
       SELECT id, host_id, room_name
       FROM streams
-      WHERE id=$1
+      WHERE id = $1
       LIMIT 1
       `,
       [streamId]
@@ -51,7 +54,7 @@ export async function GET(
     }
 
     // ============================
-    // 2. LiveKit ENV
+    // CHECK LIVEKIT ENV
     // ============================
     const apiKey = process.env.LIVEKIT_API_KEY
     const apiSecret = process.env.LIVEKIT_API_SECRET
@@ -66,7 +69,7 @@ export async function GET(
     }
 
     // ============================
-    // 3. Generate Token
+    // GENERATE LIVEKIT TOKEN
     // ============================
     const token = new AccessToken(apiKey, apiSecret, {
       identity: `host-${stream.host_id}`,
@@ -74,16 +77,19 @@ export async function GET(
 
     token.addGrant({
       roomJoin: true,
-      room: stream.room_name, // ✅ FIXED
+      room: stream.room_name,
       canPublish: true,
       canSubscribe: true,
     })
 
+    const jwt = await token.toJwt()
+
     return NextResponse.json({
       success: true,
-      token: token.toJwt(),
-      room: stream.room_name, // ✅ FIXED
+      token: jwt,
+      room: stream.room_name,
     })
+
   } catch (err: any) {
     console.error("❌ HOST TOKEN ERROR:", err)
 
