@@ -6,12 +6,12 @@ export const dynamic = "force-dynamic"
 
 export async function GET(
   req: Request,
-  context: { params: { id: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const streamId = context.params.id
+    const streamId = params.id
 
-    console.log("🔥 STREAM ID =", streamId)
+    console.log("✅ STREAM ID:", streamId)
 
     if (!streamId) {
       return NextResponse.json(
@@ -41,7 +41,7 @@ export async function GET(
       success: true,
       stream: res.rows[0],
     })
-  } catch (err) {
+  } catch (err: any) {
     console.error("❌ STREAM DETAIL ERROR:", err)
 
     return NextResponse.json(

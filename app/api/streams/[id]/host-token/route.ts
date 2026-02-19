@@ -7,11 +7,10 @@ export const dynamic = "force-dynamic"
 
 export async function GET(
   req: Request,
-  context: { params: { id: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
-    // ✅ SAFE PARAM
-    const streamId = context.params?.id
+    const streamId = params.id
 
     console.log("🎥 HOST TOKEN REQUEST ID:", streamId)
 
@@ -36,8 +35,6 @@ export async function GET(
     )
 
     if (streamRes.rows.length === 0) {
-      console.log("❌ STREAM NOT FOUND IN DB:", streamId)
-
       return NextResponse.json(
         { success: false, error: "Stream not found" },
         { status: 404 }
@@ -45,8 +42,6 @@ export async function GET(
     }
 
     const stream = streamRes.rows[0]
-
-    console.log("✅ STREAM FOUND:", stream)
 
     // ============================
     // 2. Generate Host Token
@@ -72,19 +67,19 @@ export async function GET(
       canSubscribe: true,
     })
 
-    // ============================
-    // 3. Return Token
-    // ============================
     return NextResponse.json({
       success: true,
       token: token.toJwt(),
       room: stream.room_name,
     })
-  } catch (err) {
+  } catch (err: any) {
     console.error("❌ HOST TOKEN ERROR:", err)
 
     return NextResponse.json(
-      { success: false, error: "Failed to generate host token" },
+      {
+        success: false,
+        error: err.message || "Failed to generate host token",
+      },
       { status: 500 }
     )
   }
