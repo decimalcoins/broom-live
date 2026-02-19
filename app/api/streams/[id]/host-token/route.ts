@@ -22,11 +22,11 @@ export async function GET(
     }
 
     // ============================
-    // 1. Fetch Stream From DB
+    // 1. Cek Stream di Database
     // ============================
     const streamRes = await db.query(
       `
-      SELECT id, room_name, host_uid
+      SELECT id, host_uid
       FROM streams
       WHERE id=$1
       LIMIT 1
@@ -44,7 +44,7 @@ export async function GET(
     const stream = streamRes.rows[0]
 
     // ============================
-    // 2. LiveKit ENV Check
+    // 2. Ambil ENV LiveKit
     // ============================
     const apiKey = process.env.LIVEKIT_API_KEY
     const apiSecret = process.env.LIVEKIT_API_SECRET
@@ -59,7 +59,7 @@ export async function GET(
     }
 
     // ============================
-    // 3. Generate Host Token
+    // 3. Generate Token
     // ============================
     const token = new AccessToken(apiKey, apiSecret, {
       identity: `host-${stream.host_uid}`,
@@ -67,7 +67,7 @@ export async function GET(
 
     token.addGrant({
       roomJoin: true,
-      room: stream.room_name,
+      room: streamId, // ✅ pakai streamId langsung sebagai room
       canPublish: true,
       canSubscribe: true,
     })
@@ -75,7 +75,7 @@ export async function GET(
     return NextResponse.json({
       success: true,
       token: token.toJwt(),
-      room: stream.room_name,
+      room: streamId,
     })
   } catch (err: any) {
     console.error("❌ HOST TOKEN ERROR:", err)
