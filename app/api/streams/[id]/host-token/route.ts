@@ -7,10 +7,10 @@ export const dynamic = "force-dynamic"
 
 export async function GET(
   req: Request,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
-    const streamId = params.id
+    const streamId = context?.params?.id
 
     console.log("🎥 HOST TOKEN REQUEST ID:", streamId)
 
@@ -22,7 +22,7 @@ export async function GET(
     }
 
     // ============================
-    // 1. Fetch Stream Room from DB
+    // 1. Fetch Stream From DB
     // ============================
     const streamRes = await db.query(
       `
@@ -44,18 +44,23 @@ export async function GET(
     const stream = streamRes.rows[0]
 
     // ============================
-    // 2. Generate Host Token
+    // 2. LiveKit ENV Check
     // ============================
     const apiKey = process.env.LIVEKIT_API_KEY
     const apiSecret = process.env.LIVEKIT_API_SECRET
 
     if (!apiKey || !apiSecret) {
+      console.error("❌ LiveKit ENV missing")
+
       return NextResponse.json(
         { success: false, error: "LiveKit env missing" },
         { status: 500 }
       )
     }
 
+    // ============================
+    // 3. Generate Host Token
+    // ============================
     const token = new AccessToken(apiKey, apiSecret, {
       identity: `host-${stream.host_uid}`,
     })
@@ -78,7 +83,7 @@ export async function GET(
     return NextResponse.json(
       {
         success: false,
-        error: err.message || "Failed to generate host token",
+        error: err?.message || "Failed to generate host token",
       },
       { status: 500 }
     )
