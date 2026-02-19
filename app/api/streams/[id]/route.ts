@@ -9,7 +9,9 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const streamId = params.id
+    console.log("🔥 STREAM DETAIL PARAMS:", params)
+
+    const streamId = params?.id
 
     if (!streamId) {
       return NextResponse.json(
@@ -39,7 +41,7 @@ export async function GET(
       success: true,
       stream: res.rows[0],
     })
-  } catch (err) {
+  } catch (err: any) {
     console.error("❌ STREAM DETAIL ERROR:", err)
 
     return NextResponse.json(
