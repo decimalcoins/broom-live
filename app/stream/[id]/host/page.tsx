@@ -1,12 +1,14 @@
+"use client"
+
+import { useRouter, useParams } from "next/navigation"
 import { HostStreamView } from "@/components/host-stream-view"
 import { StreamSplash } from "@/components/stream-splash"
 
-export default function HostStreamPage({
-  params,
-}: {
-  params: { id: string }
-}) {
-  const streamId = params.id
+export default function HostStreamPage() {
+  const router = useRouter()
+  const params = useParams()
+
+  const streamId = params?.id as string
 
   if (!streamId) {
     return (
@@ -16,11 +18,15 @@ export default function HostStreamPage({
     )
   }
 
+  const handleEndStream = () => {
+    router.push("/dashboard/host")
+  }
+
   return (
     <StreamSplash label="Starting Host Stream...">
       <HostStreamView
         streamId={streamId}
-        onEndStream={() => {}}
+        onEndStream={handleEndStream}
       />
     </StreamSplash>
   )
