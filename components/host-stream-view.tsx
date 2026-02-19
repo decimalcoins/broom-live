@@ -39,24 +39,27 @@ export function HostStreamView({
 
   const [giftEvent, setGiftEvent] = useState<any>(null)
 
-  // ✅ ROOM NAME FROM DB
+  // ✅ STREAM ROOM NAME
   const [roomName, setRoomName] = useState<string | null>(null)
 
-  // ✅ HOST TOKEN
+  // ✅ LIVEKIT TOKEN
   const [token, setToken] = useState<string | null>(null)
 
+  // UI State
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   // ======================================================
-  // ✅ STEP 1 — FETCH STREAM DETAIL
-  // Endpoint: /api/streams/[id]
+  // ✅ STEP 1 — FETCH STREAM DETAIL FIRST
   // ======================================================
   useEffect(() => {
     if (!streamId) return
 
     async function fetchStreamDetail() {
       try {
+        setLoading(true)
+        setError(null)
+
         const res = await fetch(`/api/streams/${streamId}`)
         const data = await res.json()
 
@@ -74,6 +77,7 @@ export function HostStreamView({
       } catch (err: any) {
         console.error("❌ Stream Detail Error:", err)
         setError(err.message)
+        setLoading(false)
       }
     }
 
@@ -81,14 +85,15 @@ export function HostStreamView({
   }, [streamId])
 
   // ======================================================
-  // ✅ STEP 2 — FETCH HOST TOKEN
-  // Endpoint: /api/streams/[id]/host-token
+  // ✅ STEP 2 — FETCH HOST TOKEN AFTER roomName READY
   // ======================================================
   useEffect(() => {
-    if (!streamId) return
+    if (!streamId || !roomName) return
 
     async function fetchHostToken() {
       try {
+        setError(null)
+
         const res = await fetch(
           `/api/streams/${streamId}/host-token`
         )
@@ -97,7 +102,7 @@ export function HostStreamView({
 
         console.log("🔑 HOST TOKEN:", data)
 
-        if (!data.success) {
+        if (!data.success || !data.token) {
           throw new Error(data.error || "Host token failed")
         }
 
@@ -111,7 +116,7 @@ export function HostStreamView({
     }
 
     fetchHostToken()
-  }, [streamId])
+  }, [streamId, roomName])
 
   // ======================================================
   // ✅ STEP 3 — LIVEKIT CONNECT
@@ -131,11 +136,14 @@ export function HostStreamView({
     if (!token) return
 
     connect()
-    return () => disconnect()
-  }, [token])
+
+    return () => {
+      disconnect()
+    }
+  }, [token, connect, disconnect])
 
   // ======================================================
-  // ✅ STEP 4 — LISTEN GIFTS REALTIME
+  // ✅ STEP 4 — REALTIME GIFTS
   // ======================================================
   useEffect(() => {
     if (!room) return
@@ -158,8 +166,11 @@ export function HostStreamView({
     }
 
     room.on("dataReceived", handleData)
-    return () => room.off("dataReceived", handleData)
-  }, [room])
+
+    return () => {
+      room.off("dataReceived", handleData)
+    }
+  }, [room, addCoins])
 
   // ======================================================
   // ✅ END STREAM
@@ -168,7 +179,6 @@ export function HostStreamView({
     if (!room || !userData) return
 
     try {
-      // Notify viewers
       room.localParticipant.publishData(
         new TextEncoder().encode(
           JSON.stringify({ type: "stream_end" })
@@ -176,7 +186,6 @@ export function HostStreamView({
         { reliable: true }
       )
 
-      // Update DB
       await fetch("/api/streams/end", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -207,7 +216,9 @@ export function HostStreamView({
   if (error) {
     return (
       <div className="h-screen flex items-center justify-center bg-black text-white">
-        <p className="text-red-500">❌ {error}</p>
+        <p className="text-red-500 text-lg">
+          ❌ {error}
+        </p>
       </div>
     )
   }
@@ -221,7 +232,7 @@ export function HostStreamView({
   }
 
   // ======================================================
-  // LOCAL CAMERA TRACK
+  // CAMERA TRACK
   // ======================================================
   const publication =
     room.localParticipant.getTrackPublication(
@@ -250,7 +261,7 @@ export function HostStreamView({
           </Card>
         </div>
 
-        {/* 🎁 Gift Animation */}
+        {/* 🎁 Gift */}
         {giftEvent && (
           <GiftAnimation
             gift={giftEvent}

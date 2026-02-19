@@ -9,31 +9,24 @@ export const API_ROUTES = {
   // USERS
   // ============================
 
-  // ✅ User Profile
   GET_USER: (id: string) => `/api/users/${id}`,
 
-  // ✅ Coin Balance
-  // app/api/user/[id]/coin/route.ts
   GET_USER_COINS: (id: string) => `/api/user/${id}/coin`,
 
-  // ✅ Logged user info
   GET_ME: `/api/user/me`,
 
   // ============================
   // TRANSACTIONS
   // ============================
 
-  // app/api/transactions/[id]/route.ts
   GET_TRANSACTIONS: (id: string) => `/api/transactions/${id}`,
 
   // ============================
   // WITHDRAWALS
   // ============================
 
-  // app/api/withdrawals/request/route.ts
   REQUEST_WITHDRAWAL: `/api/withdrawals/request`,
 
-  // app/api/withdrawals/host/[id]/route.ts (kalau ada)
   GET_WITHDRAWALS: (hostId: string) =>
     `/api/withdrawals/host/${hostId}`,
 
@@ -41,24 +34,24 @@ export const API_ROUTES = {
   // STREAMS
   // ============================
 
-  // app/api/streams/live/route.ts
   GET_LIVE_STREAMS: `/api/streams/live`,
 
-  // app/api/streams/create/route.ts
   CREATE_STREAM: `/api/streams/create`,
 
-  // app/api/streams/[id]/route.ts
+  // ✅ STREAM DETAIL (app/api/streams/[id]/route.ts)
   GET_STREAM: (id: string) => `/api/streams/${id}`,
 
-  // app/api/streams/end/route.ts
-  END_STREAM: `/api/streams/end`,
+  // ✅ HOST TOKEN (app/api/streams/[id]/host-token/route.ts)
+  HOST_TOKEN: (id: string) =>
+    `/api/streams/${id}/host-token`,
 
-  // app/api/streams/start/route.ts (kalau ada)
-  START_STREAM: `/api/streams/start`,
-
-  // app/api/streams/[id]/viewer-token/route.ts
+  // ✅ VIEWER TOKEN (app/api/streams/[id]/viewer-token/route.ts)
   VIEWER_TOKEN: (id: string) =>
     `/api/streams/${id}/viewer-token`,
+
+  END_STREAM: `/api/streams/end`,
+
+  START_STREAM: `/api/streams/start`,
 
   // ============================
   // GIFTS
@@ -84,6 +77,7 @@ export const API_ROUTES = {
   // ============================
 
   GET_ALL_WITHDRAWALS: `/api/admin/withdrawals`,
+
   PROCESS_WITHDRAWAL: (id: string) =>
     `/api/admin/withdrawals/${id}/process`,
 
