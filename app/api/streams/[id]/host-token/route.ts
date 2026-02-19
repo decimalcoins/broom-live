@@ -22,11 +22,11 @@ export async function GET(
     }
 
     // ============================
-    // 1. Ambil Stream dari DB
+    // 1. Fetch Stream from DB
     // ============================
     const streamRes = await db.query(
       `
-      SELECT id, host_id
+      SELECT id, host_id, room_name
       FROM streams
       WHERE id=$1
       LIMIT 1
@@ -43,8 +43,15 @@ export async function GET(
 
     const stream = streamRes.rows[0]
 
+    if (!stream.room_name) {
+      return NextResponse.json(
+        { success: false, error: "Room name missing in DB" },
+        { status: 400 }
+      )
+    }
+
     // ============================
-    // 2. Ambil ENV LiveKit
+    // 2. LiveKit ENV
     // ============================
     const apiKey = process.env.LIVEKIT_API_KEY
     const apiSecret = process.env.LIVEKIT_API_SECRET
@@ -62,12 +69,12 @@ export async function GET(
     // 3. Generate Token
     // ============================
     const token = new AccessToken(apiKey, apiSecret, {
-      identity: `host-${stream.host_id}`, // ✅ pakai host_id dari DB
+      identity: `host-${stream.host_id}`,
     })
 
     token.addGrant({
       roomJoin: true,
-      room: streamId, // ✅ room pakai streamId
+      room: stream.room_name, // ✅ FIXED
       canPublish: true,
       canSubscribe: true,
     })
@@ -75,7 +82,7 @@ export async function GET(
     return NextResponse.json({
       success: true,
       token: token.toJwt(),
-      room: streamId,
+      room: stream.room_name, // ✅ FIXED
     })
   } catch (err: any) {
     console.error("❌ HOST TOKEN ERROR:", err)

@@ -1,33 +1,52 @@
-"use client"
+import { NextResponse } from "next/server"
+import { db } from "@/lib/db"
 
-import { useRouter, useParams } from "next/navigation"
-import { HostStreamView } from "@/components/host-stream-view"
-import { StreamSplash } from "@/components/stream-splash"
+export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
 
-export default function HostStreamPage() {
-  const router = useRouter()
-  const params = useParams()
+export async function GET(
+  req: Request,
+  context: { params: { id: string } }
+) {
+  try {
+    const streamId = context.params.id
 
-  const streamId = params?.id as string
+    console.log("✅ STREAM ID:", streamId)
 
-  if (!streamId) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-black text-white">
-        <p className="text-red-500 text-lg">❌ Stream ID missing</p>
-      </div>
+    if (!streamId) {
+      return NextResponse.json(
+        { success: false, error: "Stream ID required" },
+        { status: 400 }
+      )
+    }
+
+    const res = await db.query(
+      `
+      SELECT *
+      FROM streams
+      WHERE id=$1
+      LIMIT 1
+      `,
+      [streamId]
+    )
+
+    if (res.rows.length === 0) {
+      return NextResponse.json(
+        { success: false, error: "Stream not found" },
+        { status: 404 }
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+      stream: res.rows[0],
+    })
+  } catch (err: any) {
+    console.error("❌ STREAM DETAIL ERROR:", err)
+
+    return NextResponse.json(
+      { success: false, error: "Failed to fetch stream" },
+      { status: 500 }
     )
   }
-
-  const handleEndStream = () => {
-    router.push("/dashboard/host")
-  }
-
-  return (
-    <StreamSplash label="Starting Host Stream...">
-      <HostStreamView
-        streamId={streamId}
-        onEndStream={handleEndStream}
-      />
-    </StreamSplash>
-  )
 }
