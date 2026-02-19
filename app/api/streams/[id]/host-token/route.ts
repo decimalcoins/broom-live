@@ -10,7 +10,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const streamId = params.id
+    const streamId = params?.id
 
     console.log("🔥 HOST TOKEN PARAM ID:", streamId)
 
@@ -21,13 +21,9 @@ export async function GET(
       )
     }
 
+    // Fetch stream
     const result = await db.query(
-      `
-      SELECT id, host_id, room_name
-      FROM streams
-      WHERE id = $1
-      LIMIT 1
-      `,
+      `SELECT id, host_id, room_name FROM streams WHERE id=$1 LIMIT 1`,
       [streamId]
     )
 
@@ -40,12 +36,19 @@ export async function GET(
 
     const stream = result.rows[0]
 
+    if (!stream.room_name) {
+      return NextResponse.json(
+        { success: false, error: "Room name missing in DB" },
+        { status: 400 }
+      )
+    }
+
     const apiKey = process.env.LIVEKIT_API_KEY
     const apiSecret = process.env.LIVEKIT_API_SECRET
 
     if (!apiKey || !apiSecret) {
       return NextResponse.json(
-        { success: false, error: "LiveKit ENV missing" },
+        { success: false, error: "LiveKit env missing" },
         { status: 500 }
       )
     }
@@ -66,15 +69,11 @@ export async function GET(
       token: token.toJwt(),
       room: stream.room_name,
     })
-
-  } catch (error: any) {
-    console.error("❌ HOST TOKEN ERROR:", error)
+  } catch (err: any) {
+    console.error("❌ HOST TOKEN ERROR:", err)
 
     return NextResponse.json(
-      {
-        success: false,
-        error: error.message,
-      },
+      { success: false, error: err.message },
       { status: 500 }
     )
   }
