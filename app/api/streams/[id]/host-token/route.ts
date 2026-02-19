@@ -22,11 +22,11 @@ export async function GET(
     }
 
     // ============================
-    // 1. Cek Stream di Database
+    // 1. Ambil Stream dari DB
     // ============================
     const streamRes = await db.query(
       `
-      SELECT id, host_uid
+      SELECT id, host_id
       FROM streams
       WHERE id=$1
       LIMIT 1
@@ -62,12 +62,12 @@ export async function GET(
     // 3. Generate Token
     // ============================
     const token = new AccessToken(apiKey, apiSecret, {
-      identity: `host-${stream.host_uid}`,
+      identity: `host-${stream.host_id}`, // ✅ pakai host_id dari DB
     })
 
     token.addGrant({
       roomJoin: true,
-      room: streamId, // ✅ pakai streamId langsung sebagai room
+      room: streamId, // ✅ room pakai streamId
       canPublish: true,
       canSubscribe: true,
     })
