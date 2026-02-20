@@ -1,82 +1,61 @@
 import { NextResponse } from "next/server"
-import { PI_API_BASE, piHeaders } from "@/lib/pi/piClient"
-import { savePayment } from "@/lib/payments-db"
+import { db } from "@/lib/db"
 
-/**
- * ✅ Required for Pi Payments on Vercel
- */
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
 export async function POST(req: Request) {
   try {
-    const { paymentId, userId, amount } = await req.json()
+    const { paymentId } = await req.json()
 
-    // =========================================
-    // 1. Validate Input
-    // =========================================
-    if (!paymentId || !userId) {
+    if (!paymentId) {
       return NextResponse.json(
-        {
-          success: false,
-          error: "Missing paymentId or userId",
-        },
+        { success: false, error: "Missing paymentId" },
         { status: 400 }
       )
     }
 
-    // =========================================
-    // 2. Approve Payment in Pi Server API
-    // =========================================
-    const res = await fetch(
-      `${PI_API_BASE}/payments/${paymentId}/approve`,
+    console.log("🟡 Approving Payment:", paymentId)
+
+    const response = await fetch(
+      `${process.env.PI_API_BASE}/payments/${paymentId}/approve`,
       {
         method: "POST",
-        headers: piHeaders(), // Authorization: Key SERVER_API_KEY
+        headers: {
+          Authorization: `Key ${process.env.PI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
       }
     )
 
-    const data = await res.json()
+    const data = await response.json()
 
-    if (!res.ok) {
-      console.error("❌ Pi Approve Failed:", data)
+    if (!response.ok || !data.status?.developer_approved) {
+      console.error("❌ PI Approve Failed:", data)
 
       return NextResponse.json(
-        {
-          success: false,
-          error: "Approve failed",
-          details: data,
-        },
-        { status: res.status }
+        { success: false, error: "Approve failed", details: data },
+        { status: response.status }
       )
     }
 
-    // =========================================
-    // 3. Save Payment Record to DB
-    // =========================================
-    await savePayment({
-      paymentId,
-      userId,
-      amount,
-      status: "APPROVED",
-    })
+    // OPTIONAL: update DB status
+    await db.query(
+      `UPDATE payments SET status='APPROVED' WHERE payment_id=$1`,
+      [paymentId]
+    )
 
-    // =========================================
-    // 4. Return Success
-    // =========================================
+    console.log("🟢 Payment Approved Successfully")
+
     return NextResponse.json({
       success: true,
-      approved: true,
       payment: data,
     })
-  } catch (err) {
+  } catch (err: any) {
     console.error("❌ Approve Error:", err)
 
     return NextResponse.json(
-      {
-        success: false,
-        error: "Internal server error",
-      },
+      { success: false, error: "Internal error" },
       { status: 500 }
     )
   }

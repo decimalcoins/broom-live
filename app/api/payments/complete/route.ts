@@ -9,29 +9,32 @@ export async function POST(req: Request) {
   const client = await db.connect()
 
   try {
-    const { paymentId, txid, userId } = await req.json()
+    const { paymentId, txid } = await req.json()
 
-    if (!paymentId || !txid || !userId) {
+    if (!paymentId || !txid) {
       return NextResponse.json(
-        { success: false, error: "Missing paymentId, txid, or userId" },
+        { success: false, error: "Missing paymentId or txid" },
         { status: 400 }
       )
     }
 
-    // Prevent double complete
-    const existing = await client.query(
-      `SELECT status FROM payments WHERE payment_id=$1 LIMIT 1`,
+    await client.query("BEGIN")
+
+    // Lock payment row
+    const paymentRes = await client.query(
+      `SELECT status FROM payments WHERE payment_id=$1 FOR UPDATE`,
       [paymentId]
     )
 
-    if (existing.rows[0]?.status === "COMPLETED") {
+    if (paymentRes.rows[0]?.status === "COMPLETED") {
+      await client.query("ROLLBACK")
       return NextResponse.json(
-        { success: false, error: "Payment already completed" },
+        { success: false, error: "Already completed" },
         { status: 400 }
       )
     }
 
-    // Complete in Pi API
+    // Call Pi API
     const res = await fetch(
       `${PI_API_BASE}/payments/${paymentId}/complete`,
       {
@@ -43,19 +46,29 @@ export async function POST(req: Request) {
 
     const data = await res.json()
 
-    if (!res.ok) {
+    if (!res.ok || !data.transaction?.verified) {
+      await client.query("ROLLBACK")
       return NextResponse.json(
-        { success: false, error: "Complete failed", details: data },
-        { status: res.status }
+        { success: false, error: "Transaction not verified" },
+        { status: 400 }
       )
     }
 
-    await client.query("BEGIN")
+    // VERIFY AMOUNT
+    const expectedAmount = 10 // example
+    if (Number(data.amount) !== expectedAmount) {
+      await client.query("ROLLBACK")
+      return NextResponse.json(
+        { success: false, error: "Invalid payment amount" },
+        { status: 400 }
+      )
+    }
 
-    // Lock user
+    const userUid = data.user_uid
+
     const userRes = await client.query(
-      `SELECT role, login_order FROM users WHERE id=$1 FOR UPDATE`,
-      [userId]
+      `SELECT id, role FROM users WHERE uid=$1 FOR UPDATE`,
+      [userUid]
     )
 
     const user = userRes.rows[0]
@@ -68,50 +81,28 @@ export async function POST(req: Request) {
       )
     }
 
-    if (user.login_order <= 100) {
+    if (user.role === "HOST") {
       await client.query("ROLLBACK")
       return NextResponse.json(
-        { success: false, error: "Early pioneers get HOST free" },
+        { success: false, error: "Already host" },
         { status: 400 }
       )
     }
 
-    if (String(user.role).toUpperCase() === "HOST") {
-      await client.query("ROLLBACK")
-      return NextResponse.json(
-        { success: false, error: "Already HOST" },
-        { status: 400 }
-      )
-    }
-
-    // Mark payment completed
     await client.query(
-      `
-      UPDATE payments
-      SET status='COMPLETED', txid=$2
-      WHERE payment_id=$1
-      `,
+      `UPDATE payments SET status='COMPLETED', txid=$2 WHERE payment_id=$1`,
       [paymentId, txid]
     )
 
-    // Reward unlock
-    const rewardCoins = 50000
-
     await client.query(
-      `
-      UPDATE users
-      SET role='HOST',
-          coin_balance = coin_balance + $1
-      WHERE id=$2
-      `,
-      [rewardCoins, userId]
+      `UPDATE users SET role='HOST' WHERE id=$1`,
+      [user.id]
     )
 
     await client.query("COMMIT")
 
     return NextResponse.json({
       success: true,
-      reward: rewardCoins,
       payment: data,
     })
   } catch (err) {
@@ -119,7 +110,7 @@ export async function POST(req: Request) {
     console.error("❌ COMPLETE ERROR:", err)
 
     return NextResponse.json(
-      { success: false, error: "Internal server error" },
+      { success: false, error: "Internal error" },
       { status: 500 }
     )
   } finally {
