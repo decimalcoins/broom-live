@@ -17,13 +17,13 @@ export async function POST(req: Request) {
     }
 
     // ============================
-    // ✅ FIND USER BY UID
+    // FIND USER
     // ============================
     const userRes = await db.query(
       `
       SELECT id, uid, username, role
       FROM users
-      WHERE uid=$1
+      WHERE uid = $1
       LIMIT 1
       `,
       [userId]
@@ -38,9 +38,6 @@ export async function POST(req: Request) {
       )
     }
 
-    // ============================
-    // ✅ ROLE CHECK
-    // ============================
     if (String(user.role).toUpperCase() !== "HOST") {
       return NextResponse.json(
         { success: false, error: "Only HOST can start streams" },
@@ -49,13 +46,14 @@ export async function POST(req: Request) {
     }
 
     // ============================
-    // ✅ CHECK ACTIVE STREAM
+    // CHECK ACTIVE STREAM (status)
     // ============================
     const existing = await db.query(
       `
       SELECT id
       FROM streams
-      WHERE host_id=$1 AND is_live=true
+      WHERE host_id = $1
+      AND status = 'active'
       LIMIT 1
       `,
       [user.id]
@@ -69,10 +67,10 @@ export async function POST(req: Request) {
     }
 
     // ============================
-    // ✅ CREATE STREAM (NOT LIVE YET)
+    // CREATE NEW STREAM
     // ============================
     const streamId = crypto.randomUUID()
-    const roomName = streamId   // ⬅️ gunakan streamId saja biar konsisten
+    const roomName = streamId
 
     const streamRes = await db.query(
       `
@@ -84,11 +82,10 @@ export async function POST(req: Request) {
         room_name,
         title,
         description,
-        is_live,
-        viewer_count,
+        status,
         created_at
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,false,0,NOW())
+      VALUES ($1,$2,$3,$4,$5,$6,$7,'active',NOW())
       RETURNING *
       `,
       [
@@ -106,6 +103,7 @@ export async function POST(req: Request) {
       success: true,
       stream: streamRes.rows[0],
     })
+
   } catch (err: any) {
     console.error("❌ CREATE STREAM ERROR:", err)
 
