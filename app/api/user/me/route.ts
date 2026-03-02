@@ -9,7 +9,8 @@ export async function POST(req: Request) {
   const client = await db.connect()
 
   try {
-    const { pi_auth_token } = await req.json()
+    const body = await req.json()
+    const pi_auth_token = body?.pi_auth_token
 
     if (!pi_auth_token) {
       return NextResponse.json(
@@ -18,7 +19,7 @@ export async function POST(req: Request) {
       )
     }
 
-    // 🔐 1. Verify token with Pi server
+    // 🔐 1. Verify token to Pi server
     const pioneer = await verifyPiToken(pi_auth_token)
 
     if (!pioneer?.uid) {
@@ -32,12 +33,12 @@ export async function POST(req: Request) {
 
     await client.query("BEGIN")
 
-    // 🔎 2. Check existing user
+    // 🔎 2. Check if user exists
     const userRes = await client.query(
       `
       SELECT id, uid, username, role, balance, reputation, login_order, kyc_verified
       FROM users
-      WHERE uid=$1
+      WHERE uid = $1
       LIMIT 1
       FOR UPDATE
       `,
@@ -47,13 +48,13 @@ export async function POST(req: Request) {
     let user = userRes.rows[0]
     let bonusCoins = 0
 
-    // 👤 3. Create new user if not exists
+    // 👤 3. If new user → create
     if (!user) {
       const counterRes = await client.query(
         `
         UPDATE login_counter
         SET current_value = current_value + 1
-        WHERE id=1
+        WHERE id = 1
         RETURNING current_value
         `
       )
@@ -62,7 +63,7 @@ export async function POST(req: Request) {
 
       let role = "VIEWER"
 
-      // 🎁 Tier Bonus Logic (tetap dipertahankan)
+      // 🎁 Tier Bonus Logic
       if (loginOrder >= 1 && loginOrder <= 20) {
         role = "HOST"
         bonusCoins = 5000
@@ -108,10 +109,10 @@ export async function POST(req: Request) {
         )
       }
     } else {
-      // 🔄 Sync KYC status setiap login
+      // 🔄 Sync KYC status every login
       if (user.kyc_verified !== kyc_verified) {
         await client.query(
-          `UPDATE users SET kyc_verified=$1 WHERE uid=$2`,
+          `UPDATE users SET kyc_verified = $1 WHERE uid = $2`,
           [kyc_verified, uid]
         )
         user.kyc_verified = kyc_verified
@@ -120,11 +121,16 @@ export async function POST(req: Request) {
 
     await client.query("COMMIT")
 
+    // 🔥 IMPORTANT: compatibility layer for old frontend
     return NextResponse.json({
       success: true,
-      user,
+      user: {
+        ...user,
+        coin_balance: user.balance, // <-- ini yang mencegah crash
+      },
       bonus_awarded: bonusCoins,
     })
+
   } catch (err: any) {
     await client.query("ROLLBACK")
     console.error("❌ /me error:", err)
