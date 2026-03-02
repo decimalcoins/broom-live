@@ -17,7 +17,7 @@ export async function POST(req: Request) {
     }
 
     // ============================
-    // ✅ FIX: ONLY SEARCH BY UID
+    // ✅ FIND USER BY UID
     // ============================
     const userRes = await db.query(
       `
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
 
     if (!user) {
       return NextResponse.json(
-        { success: false, error: "User not found in database" },
+        { success: false, error: "User not found" },
         { status: 404 }
       )
     }
@@ -49,7 +49,7 @@ export async function POST(req: Request) {
     }
 
     // ============================
-    // ✅ ACTIVE STREAM CHECK
+    // ✅ CHECK ACTIVE STREAM
     // ============================
     const existing = await db.query(
       `
@@ -69,10 +69,10 @@ export async function POST(req: Request) {
     }
 
     // ============================
-    // ✅ CREATE STREAM
+    // ✅ CREATE STREAM (NOT LIVE YET)
     // ============================
     const streamId = crypto.randomUUID()
-    const roomName = `broom_${user.uid}`
+    const roomName = streamId   // ⬅️ gunakan streamId saja biar konsisten
 
     const streamRes = await db.query(
       `
@@ -86,10 +86,9 @@ export async function POST(req: Request) {
         description,
         is_live,
         viewer_count,
-        started_at,
         created_at
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,true,0,NOW(),NOW())
+      VALUES ($1,$2,$3,$4,$5,$6,$7,false,0,NOW())
       RETURNING *
       `,
       [

@@ -1,11 +1,21 @@
-export async function verifyPiToken(accessToken: string) {
+export interface PiVerifiedUser {
+  uid: string
+  username: string
+  kyc_verified: boolean
+}
+
+export async function verifyPiToken(
+  accessToken: string
+): Promise<PiVerifiedUser> {
+  if (!process.env.PI_SERVER_API_KEY) {
+    throw new Error("Missing PI_SERVER_API_KEY")
+  }
+
   const res = await fetch("https://api.minepi.com/v2/me", {
     method: "GET",
     headers: {
       Authorization: `Bearer ${accessToken}`,
-
-      // ✅ WAJIB: Server Key Production
-      "X-Pi-Api-Key": process.env.PI_SERVER_API_KEY!,
+      "X-Pi-Api-Key": process.env.PI_SERVER_API_KEY,
     },
   })
 
@@ -15,5 +25,11 @@ export async function verifyPiToken(accessToken: string) {
     throw new Error("Invalid Pi Token")
   }
 
-  return await res.json()
+  const data = await res.json()
+
+  return {
+    uid: data.uid,
+    username: data.username || "Pioneer",
+    kyc_verified: data.kyc_verified === true,
+  }
 }

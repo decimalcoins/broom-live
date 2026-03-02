@@ -9,9 +9,6 @@ import { LiveKitProvider } from "@/contexts/livekit-context"
 import { useLiveKit } from "@/hooks/use-livekit"
 import { VideoPlayer } from "./video-player"
 
-import { ChatPanel } from "./chat-panel"
-import { GiftAnimation } from "./gift-animation"
-
 import { Button } from "./ui/button"
 import { Card } from "./ui/card"
 
@@ -37,9 +34,6 @@ export function HostStreamView({
   const { userData } = usePiAuth()
   const { addCoins } = useCoins()
 
-  const [giftEvent, setGiftEvent] = useState<any>(null)
-
-  // ✅ ROOM NAME LANGSUNG PAKAI streamId
   const roomName = streamId
 
   const [token, setToken] = useState<string | null>(null)
@@ -47,23 +41,26 @@ export function HostStreamView({
   const [error, setError] = useState<string | null>(null)
 
   // ======================================================
-  // ✅ FETCH HOST TOKEN LANGSUNG
+  // 🔐 FETCH HOST TOKEN (POST + host-UID identity)
   // ======================================================
   useEffect(() => {
-    if (!streamId) return
+    if (!streamId || !userData?.uid) return
 
     async function fetchHostToken() {
       try {
         setLoading(true)
         setError(null)
 
-        const res = await fetch(
-          `/api/streams/${streamId}/host-token`
-        )
+        const res = await fetch(`/api/livekit/host-token`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            streamId,
+            userId: userData.uid,
+          }),
+        })
 
         const data = await res.json()
-
-        console.log("🔑 HOST TOKEN:", data)
 
         if (!data.success || !data.token) {
           throw new Error(data.error || "Host token failed")
@@ -79,10 +76,10 @@ export function HostStreamView({
     }
 
     fetchHostToken()
-  }, [streamId])
+  }, [streamId, userData])
 
   // ======================================================
-  // LIVEKIT CONNECT
+  // 🎥 LIVEKIT CONNECT
   // ======================================================
   const {
     room,
@@ -97,7 +94,6 @@ export function HostStreamView({
 
   useEffect(() => {
     if (!token) return
-
     connect()
 
     return () => {
@@ -106,12 +102,32 @@ export function HostStreamView({
   }, [token, connect, disconnect])
 
   // ======================================================
-  // END STREAM
+  // 🚀 MARK STREAM LIVE AFTER CONNECT
+  // ======================================================
+  useEffect(() => {
+    if (!isConnected || !streamId) return
+
+    async function markLive() {
+      try {
+        await fetch(`/api/streams/${streamId}/start`, {
+          method: "POST",
+        })
+      } catch (err) {
+        console.error("❌ Failed to mark stream live:", err)
+      }
+    }
+
+    markLive()
+  }, [isConnected, streamId])
+
+  // ======================================================
+  // 🛑 END STREAM
   // ======================================================
   const handleEndStream = async () => {
-    if (!room || !userData) return
+    if (!room) return
 
     try {
+      // Notify viewers
       room.localParticipant.publishData(
         new TextEncoder().encode(
           JSON.stringify({ type: "stream_end" })
@@ -119,13 +135,9 @@ export function HostStreamView({
         { reliable: true }
       )
 
-      await fetch("/api/streams/end", {
+      // Update backend
+      await fetch(`/api/streams/${streamId}/end`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          streamId,
-          userId: userData.uid,
-        }),
       })
     } catch (err) {
       console.error("❌ End stream error:", err)

@@ -18,9 +18,7 @@ export async function POST(req: Request) {
       )
     }
 
-    // =========================================
-    // 1. Verify Pioneer Identity
-    // =========================================
+    // 🔐 1. Verify token with Pi server
     const pioneer = await verifyPiToken(pi_auth_token)
 
     if (!pioneer?.uid) {
@@ -30,17 +28,14 @@ export async function POST(req: Request) {
       )
     }
 
-    const uid = pioneer.uid
-    const username = pioneer.username || "Pioneer"
+    const { uid, username, kyc_verified } = pioneer
 
     await client.query("BEGIN")
 
-    // =========================================
-    // 2. Check Existing User
-    // =========================================
+    // 🔎 2. Check existing user
     const userRes = await client.query(
       `
-      SELECT id, uid, username, role, coin_balance, login_order
+      SELECT id, uid, username, role, balance, reputation, login_order, kyc_verified
       FROM users
       WHERE uid=$1
       LIMIT 1
@@ -52,9 +47,7 @@ export async function POST(req: Request) {
     let user = userRes.rows[0]
     let bonusCoins = 0
 
-    // =========================================
-    // 3. New User → Assign Tier Reward
-    // =========================================
+    // 👤 3. Create new user if not exists
     if (!user) {
       const counterRes = await client.query(
         `
@@ -69,7 +62,7 @@ export async function POST(req: Request) {
 
       let role = "VIEWER"
 
-      // 🎁 Tier Bonus Logic
+      // 🎁 Tier Bonus Logic (tetap dipertahankan)
       if (loginOrder >= 1 && loginOrder <= 20) {
         role = "HOST"
         bonusCoins = 5000
@@ -78,25 +71,33 @@ export async function POST(req: Request) {
         bonusCoins = 500
       }
 
-      // Create User
       const createRes = await client.query(
         `
         INSERT INTO users (
           uid,
           username,
           role,
-          coin_balance,
-          login_order
+          balance,
+          reputation,
+          login_order,
+          kyc_verified
         )
-        VALUES ($1,$2,$3,$4,$5)
-        RETURNING id, uid, username, role, coin_balance, login_order
+        VALUES ($1,$2,$3,$4,$5,$6,$7)
+        RETURNING *
         `,
-        [uid, username, role, bonusCoins, loginOrder]
+        [
+          uid,
+          username || "Pioneer",
+          role,
+          bonusCoins,
+          1,
+          loginOrder,
+          kyc_verified,
+        ]
       )
 
       user = createRes.rows[0]
 
-      // Save bonus history
       if (bonusCoins > 0) {
         await client.query(
           `
@@ -106,13 +107,19 @@ export async function POST(req: Request) {
           [user.id, bonusCoins]
         )
       }
+    } else {
+      // 🔄 Sync KYC status setiap login
+      if (user.kyc_verified !== kyc_verified) {
+        await client.query(
+          `UPDATE users SET kyc_verified=$1 WHERE uid=$2`,
+          [kyc_verified, uid]
+        )
+        user.kyc_verified = kyc_verified
+      }
     }
 
     await client.query("COMMIT")
 
-    // =========================================
-    // 4. Return Final User Data
-    // =========================================
     return NextResponse.json({
       success: true,
       user,
@@ -120,11 +127,10 @@ export async function POST(req: Request) {
     })
   } catch (err: any) {
     await client.query("ROLLBACK")
-
     console.error("❌ /me error:", err)
 
     return NextResponse.json(
-      { success: false, error: err.message || "Login failed" },
+      { success: false, error: "Login failed" },
       { status: 500 }
     )
   } finally {
