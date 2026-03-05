@@ -18,7 +18,6 @@ export async function POST(
       )
     }
 
-    // 🔍 Check stream exists and still live
     const streamRes = await db.query(
       `
       SELECT id, is_live
@@ -29,7 +28,7 @@ export async function POST(
       [streamId]
     )
 
-    if (streamRes.rows.length === 0) {
+    if (!streamRes.rows.length) {
       return NextResponse.json(
         { success: false, error: "Stream not found" },
         { status: 404 }
@@ -37,20 +36,19 @@ export async function POST(
     }
 
     if (!streamRes.rows[0].is_live) {
-      return NextResponse.json(
-        { success: false, error: "Stream already ended" },
-        { status: 400 }
-      )
+      return NextResponse.json({
+        success: true,
+        message: "Stream already ended",
+      })
     }
 
-    // ✅ End stream
     await db.query(
       `
       UPDATE streams
       SET is_live = FALSE,
           ended_at = NOW(),
           viewer_count = 0
-      WHERE id=$1
+      WHERE id=$1 AND is_live = TRUE
       `,
       [streamId]
     )
