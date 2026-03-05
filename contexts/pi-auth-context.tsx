@@ -50,27 +50,69 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
       setIsAuthenticated(false)
       setUserData(null)
 
-      // ✅ Wait Pi Inject
+      // ============================
+      // 1️⃣ Restore saved session
+      // ============================
+
+      if (typeof window !== "undefined") {
+        const savedToken = localStorage.getItem("pi_token")
+
+        if (savedToken) {
+          try {
+            setApiAuthToken(savedToken)
+
+            const meRes = await api.post(API_ROUTES.GET_ME, {
+              pi_auth_token: savedToken,
+            })
+
+            if (meRes.data.success) {
+              setUserData(meRes.data.user)
+              setIsAuthenticated(true)
+              setAuthMessage("✅ Session restored")
+              return
+            } else {
+              localStorage.removeItem("pi_token")
+            }
+          } catch {
+            localStorage.removeItem("pi_token")
+          }
+        }
+      }
+
+      // ============================
+      // 2️⃣ Wait Pi SDK injection
+      // ============================
+
       let tries = 0
-      while (!window.Pi && tries < 20) {
+      while (!window.Pi && tries < 50) {
         await new Promise((r) => setTimeout(r, 300))
         tries++
       }
 
       if (!window.Pi) {
-        setAuthMessage("❌ Pi Browser not detected")
+        setAuthMessage("❌ Please open inside Pi Browser")
         return
       }
 
-      // ✅ Init Pi SDK Production
-      await window.Pi.init({
-        version: "2.0",
-        sandbox: false,
-      })
+      // ============================
+      // 3️⃣ Init Pi SDK only once
+      // ============================
+
+      if (!window.Pi.__initialized) {
+        await window.Pi.init({
+          version: "2.0",
+          sandbox: false,
+        })
+
+        window.Pi.__initialized = true
+      }
 
       setAuthMessage("Authenticating with Pi...")
 
-      // ✅ FIX Scope
+      // ============================
+      // 4️⃣ Authenticate
+      // ============================
+
       const auth: PiAuthResult = await window.Pi.authenticate([
         "username",
         "payments",
@@ -80,12 +122,22 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
         throw new Error("Pi did not return accessToken")
       }
 
-      // ✅ Save token globally
+      // ============================
+      // 5️⃣ Save token
+      // ============================
+
       setApiAuthToken(auth.accessToken)
+
+      if (typeof window !== "undefined") {
+        localStorage.setItem("pi_token", auth.accessToken)
+      }
 
       setAuthMessage("Loading user profile...")
 
-      // ✅ Backend /me
+      // ============================
+      // 6️⃣ Load user from backend
+      // ============================
+
       const meRes = await api.post(API_ROUTES.GET_ME, {
         pi_auth_token: auth.accessToken,
       })

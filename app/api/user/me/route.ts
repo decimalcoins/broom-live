@@ -19,7 +19,7 @@ export async function POST(req: Request) {
       )
     }
 
-    // 🔐 1. Verify token to Pi server
+    // 🔐 Verify token with Pi server
     const pioneer = await verifyPiToken(pi_auth_token)
 
     if (!pioneer?.uid) {
@@ -33,14 +33,13 @@ export async function POST(req: Request) {
 
     await client.query("BEGIN")
 
-    // 🔎 2. Check if user exists
+    // 🔎 Check existing user
     const userRes = await client.query(
       `
       SELECT id, uid, username, role, balance, reputation, login_order, kyc_verified
       FROM users
       WHERE uid = $1
       LIMIT 1
-      FOR UPDATE
       `,
       [uid]
     )
@@ -48,7 +47,7 @@ export async function POST(req: Request) {
     let user = userRes.rows[0]
     let bonusCoins = 0
 
-    // 👤 3. If new user → create
+    // 👤 Create user if not exists
     if (!user) {
       const counterRes = await client.query(
         `
@@ -59,11 +58,15 @@ export async function POST(req: Request) {
         `
       )
 
+      if (!counterRes.rows.length) {
+        throw new Error("Login counter not initialized")
+      }
+
       const loginOrder = counterRes.rows[0].current_value
 
       let role = "VIEWER"
 
-      // 🎁 Tier Bonus Logic
+      // 🎁 Bonus tier
       if (loginOrder >= 1 && loginOrder <= 20) {
         role = "HOST"
         bonusCoins = 5000
@@ -112,31 +115,39 @@ export async function POST(req: Request) {
       // 🔄 Sync KYC status every login
       if (user.kyc_verified !== kyc_verified) {
         await client.query(
-          `UPDATE users SET kyc_verified = $1 WHERE uid = $2`,
+          `
+          UPDATE users
+          SET kyc_verified = $1
+          WHERE uid = $2
+          `,
           [kyc_verified, uid]
         )
+
         user.kyc_verified = kyc_verified
       }
     }
 
     await client.query("COMMIT")
 
-    // 🔥 IMPORTANT: compatibility layer for old frontend
+    // ✅ Response to frontend
     return NextResponse.json({
       success: true,
       user: {
         ...user,
-        coin_balance: user.balance, // <-- ini yang mencegah crash
+        coin_balance: user.balance,
       },
       bonus_awarded: bonusCoins,
     })
-
   } catch (err: any) {
     await client.query("ROLLBACK")
+
     console.error("❌ /me error:", err)
 
     return NextResponse.json(
-      { success: false, error: "Login failed" },
+      {
+        success: false,
+        error: "Login failed",
+      },
       { status: 500 }
     )
   } finally {
