@@ -6,7 +6,7 @@ export const runtime = "nodejs"
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { streamId, userId } = body
+    const { streamId, userId, username } = body
 
     if (!streamId || !userId) {
       return NextResponse.json(
@@ -20,30 +20,39 @@ export async function POST(req: Request) {
 
     if (!apiKey || !apiSecret) {
       console.error("❌ LiveKit ENV missing")
+
       return NextResponse.json(
         { success: false, error: "LiveKit config missing" },
         { status: 500 }
       )
     }
 
-    // ✅ IMPORTANT: Standardized host identity
+    // 🔑 Host identity
     const identity = `host-${userId}`
 
     const token = new AccessToken(apiKey, apiSecret, {
       identity,
+      name: username || identity,
+      ttl: "2h", // token berlaku 2 jam
     })
 
     token.addGrant({
       roomJoin: true,
       room: streamId,
+
       canPublish: true,
       canSubscribe: true,
+
+      canPublishData: true,
     })
 
     return NextResponse.json({
       success: true,
       token: token.toJwt(),
+      identity,
+      room: streamId,
     })
+
   } catch (err) {
     console.error("❌ Host token error:", err)
 
