@@ -15,6 +15,15 @@ export async function POST(req: Request) {
       )
     }
 
+    if (!process.env.PI_API_BASE || !process.env.PI_API_KEY) {
+      console.error("❌ Missing PI API ENV")
+
+      return NextResponse.json(
+        { success: false, error: "Server configuration error" },
+        { status: 500 }
+      )
+    }
+
     console.log("🟡 Approving Payment:", paymentId)
 
     const response = await fetch(
@@ -28,20 +37,29 @@ export async function POST(req: Request) {
       }
     )
 
-    const data = await response.json()
+    const data = await response.json().catch(() => null)
 
-    if (!response.ok || !data.status?.developer_approved) {
+    if (!response.ok || !data?.status?.developer_approved) {
       console.error("❌ PI Approve Failed:", data)
 
       return NextResponse.json(
-        { success: false, error: "Approve failed", details: data },
+        {
+          success: false,
+          error: "Approve failed",
+          details: data,
+        },
         { status: response.status }
       )
     }
 
-    // OPTIONAL: update DB status
+    // Save/update payment status
     await db.query(
-      `UPDATE payments SET status='APPROVED' WHERE payment_id=$1`,
+      `
+      INSERT INTO payments (payment_id, status)
+      VALUES ($1, 'APPROVED')
+      ON CONFLICT (payment_id)
+      DO UPDATE SET status='APPROVED'
+      `,
       [paymentId]
     )
 
@@ -55,7 +73,10 @@ export async function POST(req: Request) {
     console.error("❌ Approve Error:", err)
 
     return NextResponse.json(
-      { success: false, error: "Internal error" },
+      {
+        success: false,
+        error: "Internal server error",
+      },
       { status: 500 }
     )
   }

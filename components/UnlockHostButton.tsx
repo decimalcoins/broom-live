@@ -6,7 +6,7 @@ export default function UnlockHostButton({ userId }: { userId: string }) {
   const [loading, setLoading] = useState(false)
 
   async function handleUnlock() {
-    if (!window.Pi) {
+    if (!window.Pi || !window.Pi.createPayment) {
       alert("❌ Pi SDK not found. Please open inside Pi Browser.")
       return
     }
@@ -20,14 +20,21 @@ export default function UnlockHostButton({ userId }: { userId: string }) {
         {
           amount: 1,
           memo: "Unlock Host Access",
-          metadata: { type: "host_unlock" },
+          metadata: {
+            type: "host_unlock",
+          },
         },
         {
-          // ✅ Approve
+          // ============================
+          // Server approval
+          // ============================
+
           onReadyForServerApproval: async (paymentId: string) => {
             const res = await fetch("/api/payments/approve", {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: {
+                "Content-Type": "application/json",
+              },
               body: JSON.stringify({
                 paymentId,
                 userId,
@@ -35,18 +42,26 @@ export default function UnlockHostButton({ userId }: { userId: string }) {
               }),
             })
 
-            const data = await res.json()
-            if (!data.success) throw new Error(data.error)
+            const data = await res.json().catch(() => null)
+
+            if (!res.ok || !data?.success) {
+              throw new Error(data?.error || "Server approval failed")
+            }
           },
 
-          // ✅ Complete
+          // ============================
+          // Server completion
+          // ============================
+
           onReadyForServerCompletion: async (
             paymentId: string,
             txid: string
           ) => {
             const res = await fetch("/api/payments/complete", {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: {
+                "Content-Type": "application/json",
+              },
               body: JSON.stringify({
                 paymentId,
                 txid,
@@ -54,33 +69,45 @@ export default function UnlockHostButton({ userId }: { userId: string }) {
               }),
             })
 
-            const data = await res.json()
+            const data = await res.json().catch(() => null)
 
-            if (!data.success) {
-              alert("❌ Unlock failed: " + data.error)
+            if (!res.ok || !data?.success) {
+              alert("❌ Unlock failed: " + (data?.error || "Unknown error"))
               setLoading(false)
               return
             }
 
             alert("🎉 Host Unlocked! +50,000 Coins")
+
+            setLoading(false)
+
+            // refresh dashboard
             window.location.reload()
           },
 
+          // ============================
           // Cancel
+          // ============================
+
           onCancel: () => {
             alert("Payment cancelled.")
             setLoading(false)
           },
 
+          // ============================
           // Error
+          // ============================
+
           onError: (err: any) => {
-            alert("Payment error: " + err?.message)
+            console.error("Pi Payment Error:", err)
+            alert("Payment error: " + (err?.message || "Unknown error"))
             setLoading(false)
           },
         }
       )
     } catch (err: any) {
-      alert("Unlock failed: " + err.message)
+      console.error("Unlock error:", err)
+      alert("Unlock failed: " + (err?.message || "Unknown error"))
       setLoading(false)
     }
   }

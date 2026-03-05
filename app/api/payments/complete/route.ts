@@ -20,21 +20,29 @@ export async function POST(req: Request) {
 
     await client.query("BEGIN")
 
-    // Lock payment row
+    // 🔒 Lock payment row
     const paymentRes = await client.query(
       `SELECT status FROM payments WHERE payment_id=$1 FOR UPDATE`,
       [paymentId]
     )
 
-    if (paymentRes.rows[0]?.status === "COMPLETED") {
+    if (!paymentRes.rows.length) {
       await client.query("ROLLBACK")
       return NextResponse.json(
-        { success: false, error: "Already completed" },
-        { status: 400 }
+        { success: false, error: "Payment not found" },
+        { status: 404 }
       )
     }
 
-    // Call Pi API
+    if (paymentRes.rows[0].status === "COMPLETED") {
+      await client.query("ROLLBACK")
+      return NextResponse.json({
+        success: true,
+        message: "Payment already completed",
+      })
+    }
+
+    // 🔎 Verify transaction with Pi server
     const res = await fetch(
       `${PI_API_BASE}/payments/${paymentId}/complete`,
       {
@@ -44,9 +52,9 @@ export async function POST(req: Request) {
       }
     )
 
-    const data = await res.json()
+    const data = await res.json().catch(() => null)
 
-    if (!res.ok || !data.transaction?.verified) {
+    if (!res.ok || !data?.transaction?.verified) {
       await client.query("ROLLBACK")
       return NextResponse.json(
         { success: false, error: "Transaction not verified" },
@@ -54,8 +62,9 @@ export async function POST(req: Request) {
       )
     }
 
-    // VERIFY AMOUNT
-    const expectedAmount = 10 // example
+    // 🔎 Verify payment amount
+    const expectedAmount = 1
+
     if (Number(data.amount) !== expectedAmount) {
       await client.query("ROLLBACK")
       return NextResponse.json(
@@ -83,20 +92,32 @@ export async function POST(req: Request) {
 
     if (user.role === "HOST") {
       await client.query("ROLLBACK")
-      return NextResponse.json(
-        { success: false, error: "Already host" },
-        { status: 400 }
-      )
+      return NextResponse.json({
+        success: true,
+        message: "User already host",
+      })
     }
 
+    // 🪙 Give reward
     await client.query(
-      `UPDATE payments SET status='COMPLETED', txid=$2 WHERE payment_id=$1`,
-      [paymentId, txid]
+      `
+      UPDATE users
+      SET role='HOST',
+          balance = balance + 50000
+      WHERE id=$1
+      `,
+      [user.id]
     )
 
+    // ✅ Mark payment completed
     await client.query(
-      `UPDATE users SET role='HOST' WHERE id=$1`,
-      [user.id]
+      `
+      UPDATE payments
+      SET status='COMPLETED',
+          txid=$2
+      WHERE payment_id=$1
+      `,
+      [paymentId, txid]
     )
 
     await client.query("COMMIT")
@@ -107,6 +128,7 @@ export async function POST(req: Request) {
     })
   } catch (err) {
     await client.query("ROLLBACK")
+
     console.error("❌ COMPLETE ERROR:", err)
 
     return NextResponse.json(
