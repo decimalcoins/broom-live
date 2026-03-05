@@ -1,63 +1,61 @@
 import { NextResponse } from "next/server"
-import { AccessToken } from "livekit-server-sdk"
+import { db } from "@/lib/db"
+import { randomUUID } from "crypto"
 
 export const runtime = "nodejs"
 
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { streamId, userId, username } = body
+    const { hostId, hostUsername, title } = body
 
-    if (!streamId || !userId) {
+    if (!hostId) {
       return NextResponse.json(
-        { success: false, error: "Missing streamId or userId" },
+        { success: false, error: "Host ID missing" },
         { status: 400 }
       )
     }
 
-    const apiKey = process.env.LIVEKIT_API_KEY
-    const apiSecret = process.env.LIVEKIT_API_SECRET
+    // 🔴 tutup stream lama
+    await db.query(
+      `
+      UPDATE streams
+      SET is_live = FALSE
+      WHERE host_id = $1
+      AND is_live = TRUE
+      `,
+      [hostId]
+    )
 
-    if (!apiKey || !apiSecret) {
-      console.error("❌ LiveKit ENV missing")
+    // 🟢 buat stream baru
+    const streamId = randomUUID()
 
-      return NextResponse.json(
-        { success: false, error: "LiveKit config missing" },
-        { status: 500 }
+    const result = await db.query(
+      `
+      INSERT INTO streams (
+        id,
+        host_id,
+        host_username,
+        title,
+        is_live,
+        viewer_count
       )
-    }
-
-    // 🔑 Host identity
-    const identity = `host-${userId}`
-
-    const token = new AccessToken(apiKey, apiSecret, {
-      identity,
-      name: username || identity,
-      ttl: "2h", // token berlaku 2 jam
-    })
-
-    token.addGrant({
-      roomJoin: true,
-      room: streamId,
-
-      canPublish: true,
-      canSubscribe: true,
-
-      canPublishData: true,
-    })
+      VALUES ($1,$2,$3,$4,TRUE,0)
+      RETURNING *
+      `,
+      [streamId, hostId, hostUsername, title || "Live"]
+    )
 
     return NextResponse.json({
       success: true,
-      token: token.toJwt(),
-      identity,
-      room: streamId,
+      stream: result.rows[0],
     })
 
   } catch (err) {
-    console.error("❌ Host token error:", err)
+    console.error("❌ Start stream error:", err)
 
     return NextResponse.json(
-      { success: false, error: "Failed to generate host token" },
+      { success: false, error: "Failed to start stream" },
       { status: 500 }
     )
   }
